@@ -3,19 +3,17 @@ use crate::protocol::args::*;
 
 mod args {
     #[derive(Debug, Copy, Clone)]
-    pub struct AddressArg {
-        address: u16,
-    }
+    pub struct AddressArg(u16);
 
     impl AddressArg {
         pub fn parse(adr2: u8, adr: u8) -> AddressArg {
             let mut address = adr as u16;
             address |= (adr2 as u16) << 7;
-            AddressArg { address }
+            AddressArg(address)
         }
 
         pub fn address(&self) -> u16 {
-            self.address
+            self.0
         }
 
         pub fn set_address(&mut self, address: u16) {
@@ -24,7 +22,7 @@ mod args {
                 0,
                 "address must only use the 14 least significant bits"
             );
-            self.address = address;
+            self.0 = address;
         }
     }
 
@@ -87,19 +85,15 @@ mod args {
     }
 
     #[derive(Debug, Copy, Clone)]
-    pub struct SlotArg {
-        number: u8,
-    }
+    pub struct SlotArg(u8);
 
     impl SlotArg {
         pub fn parse(slot: u8) -> SlotArg {
-            SlotArg {
-                number: slot & 0x7F,
-            }
+            SlotArg(slot & 0x7F)
         }
 
         pub fn number(&self) -> u8 {
-            self.number
+            self.0
         }
 
         pub fn set_number(&mut self, number: u8) {
@@ -107,7 +101,8 @@ mod args {
                 number & 0x7F,
                 0,
                 "number must only use the 7 least significant bits"
-            )
+            );
+            self.0 = number;
         }
     }
 
