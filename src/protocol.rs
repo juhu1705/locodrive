@@ -175,7 +175,13 @@ impl Message {
     }
 
     fn parse2(opc: u8) -> Result<Message, MessageParseError> {
-        Err(MessageParseError::UnknownOpcode(opc))
+        match opc {
+            0x85 => Ok(Self::Idle),
+            0x83 => Ok(Self::GpOn),
+            0x82 => Ok(Self::GpOff),
+            0x81 => Ok(Self::Busy),
+            _ => Err(MessageParseError::UnknownOpcode(opc)),
+        }
     }
 
     fn parse4(opc: u8, args: &[u8]) -> Result<Message, MessageParseError> {
