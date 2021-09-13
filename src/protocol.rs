@@ -2,6 +2,8 @@ use crate::error::MessageParseError;
 use crate::protocol::args::*;
 
 mod args {
+    use std::fmt::{Debug, Formatter};
+
     #[derive(Debug, Copy, Clone)]
     pub struct AddressArg(u16);
 
@@ -88,6 +90,10 @@ mod args {
     pub struct SlotArg(u8);
 
     impl SlotArg {
+        pub fn new(number: u8) -> Self {
+            SlotArg(number)
+        }
+
         pub fn parse(slot: u8) -> SlotArg {
             SlotArg(slot & 0x7F)
         }
@@ -122,6 +128,184 @@ mod args {
             }
         }
     }
+
+    #[derive(Copy, Clone)]
+    pub struct DirfArg(u8);
+
+    impl DirfArg {
+        pub fn parse(dirf: u8) -> Self {
+            Self(dirf & 0x3F)
+        }
+
+        pub fn dir(&self) -> bool {
+            self.0 & 0x20 != 0
+        }
+
+        pub fn f(&self, f_num: u8) -> bool {
+            assert!(f_num <= 4, "f must be lower than or equal to 4");
+            self.0 >> (if f_num == 0 { 4 } else { f_num - 1 }) & 1 != 0
+        }
+
+        pub fn set_dir(&mut self, value: bool) {
+            if value {
+                self.0 |= 0x20;
+            } else {
+                self.0 &= !0x20
+            }
+        }
+
+        pub fn set_f(&mut self, f_num: u8, value: bool) {
+            self.0 |= if value { 1 } else { 0 } << (if f_num == 0 { 4 } else { f_num - 1 })
+        }
+    }
+
+    impl Debug for DirfArg {
+        fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+            write!(
+                f,
+                "DirfArg(dir: {}, f0: {}, f1: {}, f2: {}, f3: {}, f4: {})",
+                self.dir(),
+                self.f(0),
+                self.f(1),
+                self.f(2),
+                self.f(3),
+                self.f(4)
+            )
+        }
+    }
+
+    #[derive(Debug, Copy, Clone)]
+    pub struct LopcArg(u8);
+
+    impl LopcArg {
+        pub fn parse(lopc: u8) -> Self {
+            Self(lopc & !0x40)
+        }
+
+        pub fn lopc(&self) -> u8 {
+            self.0
+        }
+
+        pub fn set_lopc(&mut self, lopc: u8) {
+            assert_eq!(lopc & 0x40, 0, "7th least significant bit must be 0");
+            self.0 = lopc
+        }
+    }
+
+    #[derive(Debug, Copy, Clone)]
+    pub struct Ack1Arg(u8);
+
+    impl Ack1Arg {
+        pub fn parse(ack1: u8) -> Self {
+            Self(ack1)
+        }
+
+        pub fn code(&self) -> u8 {
+            self.0
+        }
+
+        pub fn success(&self) -> bool {
+            self.0 != 0
+        }
+
+        pub fn set_code(&mut self, code: u8) {
+            self.0 = code
+        }
+    }
+
+    #[derive(Copy, Clone)]
+    pub struct InArg {
+        address: u16,
+        source_type: SourceType,
+        state: bool,
+    }
+
+    #[derive(Debug, Copy, Clone, PartialEq)]
+    pub enum SourceType {
+        Aux,
+        Switch,
+    }
+
+    impl InArg {
+        pub fn parse(in1: u8, in2: u8) -> Self {
+            let mut address = in1 as u16;
+            address |= (in2 as u16 & 0x0F) << 7;
+
+            let source_type = if in2 & 0x20 == 0 {
+                SourceType::Aux
+            } else {
+                SourceType::Switch
+            };
+
+            let state = (in2 & 0x10) != 0;
+            InArg {
+                address,
+                source_type,
+                state,
+            }
+        }
+
+        pub fn address(&self) -> u16 {
+            self.address
+        }
+        pub fn address_ds54(&self) -> u16 {
+            self.address << 1
+                | if self.source_type() == SourceType::Switch {
+                    1
+                } else {
+                    0
+                }
+        }
+        pub fn source_type(&self) -> SourceType {
+            self.source_type
+        }
+        pub fn state(&self) -> bool {
+            self.state
+        }
+
+        pub fn set_address(&mut self, address: u16) {
+            assert_eq!(
+                address & 0x03FF,
+                0,
+                "address must only use the 11 least significant bits"
+            );
+            self.address = address;
+        }
+
+        pub fn set_address_ds54(&mut self, address_ds54: u16) {
+            assert_eq!(
+                self.address & 0x07FF,
+                0,
+                "address must only use the 12 least significant bits"
+            );
+            self.set_source_type(if address_ds54 & 1 == 0 {
+                SourceType::Aux
+            } else {
+                SourceType::Switch
+            });
+            self.set_address(address_ds54 >> 1);
+        }
+
+        pub fn set_source_type(&mut self, source_type: SourceType) {
+            self.source_type = source_type;
+        }
+        pub fn set_state(&mut self, state: bool) {
+            self.state = state;
+        }
+    }
+
+    impl Debug for InArg {
+        fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+            write!(
+                f,
+                "InArg {{ address: {:?} (DS54: {:?}), source_type: {:?}, state: {:?} }}",
+                self.address(),
+                self.address_ds54(),
+                self.source_type(),
+                self.state()
+            )
+        }
+    }
 }
 
 #[repr(u8)]
@@ -133,7 +317,20 @@ pub enum Message {
     Busy = 0x81,
 
     LocoAdr(AddressArg) = 0xBF,
+    SwAck(SwitchArg) = 0xBD,
     SwState(SwitchArg) = 0xBC,
+    RqSlData(SlotArg) = 0xBB,
+    MoveSlots(SlotArg, SlotArg) = 0xBA,
+    LinkSlots(SlotArg, SlotArg) = 0xB9,
+    UnlinkSlots(SlotArg, SlotArg) = 0xB8,
+    ConsistFunc(SlotArg, DirfArg) = 0xB6,
+    // TODO: SlotStat1 0xB5
+    LongAck(LopcArg, Ack1Arg) = 0xB4,
+    InputRep(InArg) = 0xB2,
+    // TODO: SwRep 0xB1
+    SwReq(SwitchArg) = 0xB0,
+    // TODO: LocoSnd 0xA2
+    LocoDirf(SlotArg, DirfArg) = 0xA1,
     LocoSpd(SlotArg, SpeedArg) = 0xA0,
 }
 
@@ -183,7 +380,38 @@ impl Message {
         assert_eq!(args.len(), 2, "length of args mut be 2");
         match opc {
             0xBF => Ok(Self::LocoAdr(AddressArg::parse(args[0], args[1]))),
+            0xBD => Ok(Self::SwAck(SwitchArg::parse(args[0], args[1]))),
             0xBC => Ok(Self::SwState(SwitchArg::parse(args[0], args[1]))),
+            0xBB => Ok(Self::RqSlData(SlotArg::parse(args[0]))),
+            0xBA => Ok(Self::MoveSlots(
+                SlotArg::parse(args[0]),
+                SlotArg::parse(args[1]),
+            )),
+            0xB9 => Ok(Self::LinkSlots(
+                SlotArg::parse(args[0]),
+                SlotArg::parse(args[1]),
+            )),
+            0xB8 => Ok(Self::UnlinkSlots(
+                SlotArg::parse(args[0]),
+                SlotArg::parse(args[1]),
+            )),
+            0xB6 => Ok(Self::ConsistFunc(
+                SlotArg::parse(args[0]),
+                DirfArg::parse(args[1]),
+            )),
+            // TODO: 0xB5 => Ok(Self::SlotStat1(...))
+            0xB4 => Ok(Self::LongAck(
+                LopcArg::parse(args[0]),
+                Ack1Arg::parse(args[1]),
+            )),
+            0xB2 => Ok(Self::InputRep(InArg::parse(args[0], args[1]))),
+            // TODO: 0xB1 => Ok(Self::SwRep(...))
+            // TODO: 0xA2 => Ok(Self::LocoSnd(...))
+            0xB0 => Ok(Self::SwReq(SwitchArg::parse(args[0], args[1]))),
+            0xA1 => Ok(Self::LocoDirf(
+                SlotArg::new(args[0]),
+                DirfArg::parse(args[1]),
+            )),
             0xA0 => Ok(Self::LocoSpd(
                 SlotArg::parse(args[0]),
                 SpeedArg::parse(args[1]),
