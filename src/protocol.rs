@@ -8,10 +8,10 @@ mod args {
     pub struct AddressArg(u16);
 
     impl AddressArg {
-        pub fn parse(adr2: u8, adr: u8) -> AddressArg {
+        pub fn parse(adr2: u8, adr: u8) -> Self {
             let mut address = adr as u16;
             address |= (adr2 as u16) << 7;
-            AddressArg(address)
+            Self(address)
         }
 
         pub fn address(&self) -> u16 {
@@ -42,7 +42,7 @@ mod args {
     }
 
     impl SwitchArg {
-        pub fn parse(sw1: u8, sw2: u8) -> SwitchArg {
+        pub fn parse(sw1: u8, sw2: u8) -> Self {
             let mut address = sw1 as u16;
             address |= (sw2 as u16 & 0x0F) << 7;
 
@@ -53,7 +53,7 @@ mod args {
             };
 
             let state = (sw2 & 0x10) != 0;
-            SwitchArg {
+            Self {
                 address,
                 direction,
                 state,
@@ -91,11 +91,11 @@ mod args {
 
     impl SlotArg {
         pub fn new(number: u8) -> Self {
-            SlotArg(number)
+            Self(number)
         }
 
-        pub fn parse(slot: u8) -> SlotArg {
-            SlotArg(slot & 0x7F)
+        pub fn parse(slot: u8) -> Self {
+            Self(slot & 0x7F)
         }
 
         pub fn number(&self) -> u8 {
@@ -120,11 +120,11 @@ mod args {
     }
 
     impl SpeedArg {
-        pub fn parse(spd: u8) -> SpeedArg {
+        pub fn parse(spd: u8) -> Self {
             match spd {
-                0x00 => SpeedArg::Stop,
-                0x01 => SpeedArg::EmergencyStop,
-                _ => SpeedArg::Drive(spd - 1),
+                0x00 => Self::Stop,
+                0x01 => Self::EmergencyStop,
+                _ => Self::Drive(spd - 1),
             }
         }
     }
@@ -274,7 +274,7 @@ mod args {
             };
 
             let state = (in2 & 0x10) != 0;
-            InArg {
+            Self {
                 address,
                 source_type,
                 state,
@@ -384,7 +384,7 @@ impl Message {
     /// [`UnknownOpcode`]: MessageParseError::UnknownOpcode
     /// [`UnexpectedEnd`]: MessageParseError::UnexpectedEnd
     /// [`InvalidChecksum`]: MessageParseError::InvalidChecksum
-    pub fn parse<I: Iterator<Item = u8>>(stream: &mut I) -> Result<Message, MessageParseError> {
+    pub fn parse<I: Iterator<Item = u8>>(stream: &mut I) -> Result<Self, MessageParseError> {
         // create the buffer (a message can be at most 256 bytes long)
         // and map the iterator to store all read bytes in the buffer
         let mut buf = [0u8; 256];
@@ -428,7 +428,7 @@ impl Message {
         }
     }
 
-    fn parse2(opc: u8) -> Result<Message, MessageParseError> {
+    fn parse2(opc: u8) -> Result<Self, MessageParseError> {
         match opc {
             0x85 => Ok(Self::Idle),
             0x83 => Ok(Self::GpOn),
@@ -438,7 +438,7 @@ impl Message {
         }
     }
 
-    fn parse4(opc: u8, args: &[u8]) -> Result<Message, MessageParseError> {
+    fn parse4(opc: u8, args: &[u8]) -> Result<Self, MessageParseError> {
         assert_eq!(args.len(), 2, "length of args mut be 2");
         match opc {
             0xBF => Ok(Self::LocoAdr(AddressArg::parse(args[0], args[1]))),
@@ -485,13 +485,13 @@ impl Message {
         }
     }
 
-    fn parse6(opc: u8, args: &[u8]) -> Result<Message, MessageParseError> {
+    fn parse6(opc: u8, args: &[u8]) -> Result<Self, MessageParseError> {
         assert_eq!(args.len(), 4, "length of args mut be 4");
         Err(MessageParseError::UnknownOpcode(opc))
     }
 
     #[allow(unused_variables)] // TODO: remove allowance when parse_var is implemented
-    fn parse_var(opc: u8, args: &[u8]) -> Result<Message, MessageParseError> {
+    fn parse_var(opc: u8, args: &[u8]) -> Result<Self, MessageParseError> {
         Err(MessageParseError::UnknownOpcode(opc))
     }
 
