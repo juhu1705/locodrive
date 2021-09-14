@@ -181,6 +181,36 @@ mod args {
     }
 
     #[derive(Debug, Copy, Clone)]
+    pub struct SndArg(u8);
+
+    impl SndArg {
+        pub fn parse(snd: u8) -> Self {
+            Self(snd & 0x0F)
+        }
+
+        pub fn f(&self, f_num: u8) -> bool {
+            assert!(
+                (5..=8).contains(&f_num),
+                "f_num must be within 5 and 8 (inclusive)"
+            );
+            self.0 & 1 << (f_num - 5) != 0
+        }
+
+        pub fn set_f(&mut self, f_num: u8, value: bool) {
+            assert!(
+                (5..=8).contains(&f_num),
+                "f_num must be within 5 and 8 (inclusive)"
+            );
+            let mask = 1 << (f_num - 5);
+            if value {
+                self.0 |= mask;
+            } else {
+                self.0 &= !mask;
+            }
+        }
+    }
+
+    #[derive(Debug, Copy, Clone)]
     pub struct LopcArg(u8);
 
     impl LopcArg {
@@ -335,7 +365,7 @@ pub enum Message {
     InputRep(InArg) = 0xB2,
     // TODO: SwRep 0xB1
     SwReq(SwitchArg) = 0xB0,
-    // TODO: LocoSnd 0xA2
+    LocoSnd(SlotArg, SndArg) = 0xA2,
     LocoDirf(SlotArg, DirfArg) = 0xA1,
     LocoSpd(SlotArg, SpeedArg) = 0xA0,
 }
@@ -438,7 +468,10 @@ impl Message {
             )),
             0xB2 => Ok(Self::InputRep(InArg::parse(args[0], args[1]))),
             // TODO: 0xB1 => Ok(Self::SwRep(...))
-            // TODO: 0xA2 => Ok(Self::LocoSnd(...))
+            0xA2 => Ok(Self::LocoSnd(
+                SlotArg::parse(args[0]),
+                SndArg::parse(args[1]),
+            )),
             0xB0 => Ok(Self::SwReq(SwitchArg::parse(args[0], args[1]))),
             0xA1 => Ok(Self::LocoDirf(
                 SlotArg::new(args[0]),
