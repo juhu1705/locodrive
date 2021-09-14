@@ -341,34 +341,60 @@ pub enum Message {
 }
 
 impl Message {
-    pub fn parse(msg: &[u8]) -> Result<Message, MessageParseError> {
-        if msg.len() < 2 {
-            return Err(MessageParseError::InvalidLength(msg.len()));
+    /// Reads and Parses the next message from `stream`.
+    ///
+    /// # Errors
+    ///
+    /// This function returns an error if the message could not be parsed:
+    ///
+    /// * [`UnknownOpcode`] if the message has an unknown opcode
+    /// * [`UnexpectedEnd`] if `stream` unexpectedly yields [`None`]
+    /// * [`InvalidChecksum`] if the checksum is invalid
+    ///
+    /// [`UnknownOpcode`]: MessageParseError::UnknownOpcode
+    /// [`UnexpectedEnd`]: MessageParseError::UnexpectedEnd
+    /// [`InvalidChecksum`]: MessageParseError::InvalidChecksum
+    pub fn parse<I: Iterator<Item = u8>>(stream: &mut I) -> Result<Message, MessageParseError> {
+        // create the buffer (a message can be at most 256 bytes long)
+        // and map the iterator to store all read bytes in the buffer
+        let mut buf = [0u8; 256];
+        let mut stream = stream.enumerate().map(|(i, b)| {
+            buf[i] = b;
+            b
+        });
+
+        // get first two bytes from stream
+        let (opc, byte1) = match stream.next().zip(stream.next()) {
+            Some(bytes) => bytes,
+            None => return Err(MessageParseError::UnexpectedEnd),
+        };
+
+        // determine length of the message by comparing the ms 3 bytes
+        let len = match opc & 0xE0 {
+            0x80 => 2,
+            0xA0 => 4,
+            0xC0 => 6,
+            0xE0 => byte1 as usize,
+            _ => return Err(MessageParseError::UnknownOpcode(opc)),
+        };
+
+        // advance iterator by len - 2 to read full message into buf
+        // TODO: replace with `advance_by(len - 2)` when available
+        if len > 2 && stream.nth(len - 3) == None {
+            return Err(MessageParseError::UnexpectedEnd);
         }
 
-        if !Self::validate(msg) {
+        // validate checksum
+        if !Self::validate(&buf[0..len]) {
             return Err(MessageParseError::InvalidChecksum);
         }
 
-        let opc = msg[0];
-        if (0x80..=0x8F).contains(&opc) {
-            if msg.len() != 2 {
-                return Err(MessageParseError::InvalidLength(msg.len()));
-            }
-            Self::parse2(opc)
-        } else if (0xA0..=0xBF).contains(&opc) {
-            if msg.len() != 4 {
-                return Err(MessageParseError::InvalidLength(msg.len()));
-            }
-            Self::parse4(opc, &msg[1..3])
-        } else if (0xD0..=0xDF).contains(&opc) {
-            if msg.len() != 6 {
-                return Err(MessageParseError::InvalidLength(msg.len()));
-            }
-            Self::parse6(opc, &msg[1..5])
-        } else {
-            let count = msg[1] as usize;
-            Self::parse_var(opc, &msg[2..count - 1])
+        // call appropriate parse function
+        match len {
+            2 => Self::parse2(opc),
+            4 => Self::parse4(opc, &buf[1..3]),
+            6 => Self::parse6(opc, &buf[1..5]),
+            var => Self::parse_var(opc, &buf[1..var - 1]),
         }
     }
 

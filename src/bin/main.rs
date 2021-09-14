@@ -1,10 +1,11 @@
 extern crate serial;
 
 use std::io::prelude::*;
-use std::io::{BufReader, Bytes};
+use std::io::BufReader;
 use std::time::Duration;
 use std::{env, process};
 
+use locodrive::error::MessageParseError;
 use locodrive::protocol::Message;
 use serial::prelude::*;
 
@@ -39,42 +40,29 @@ fn main() {
         process::exit(2);
     }
 
-    let mut stream = BufReader::new(port).bytes();
-    let mut msg = Vec::new();
-    msg.push(next_byte(&mut stream));
-    loop {
-        let byte = next_byte(&mut stream);
-        if byte & 0x80 != 0 {
-            parse(&msg);
-            msg.clear();
-        }
-        msg.push(byte);
-    }
-}
-
-fn next_byte<R: Read>(bytes: &mut Bytes<R>) -> u8 {
-    match bytes.next() {
-        Some(byte_result) => match byte_result {
-            Ok(byte) => byte,
-            Err(err) => {
-                eprintln!("Error while reading from serial port: {}", err);
-                process::exit(2);
-            }
-        },
-        None => {
-            eprintln!("Error while reading from serial port: next() returned None");
-            process::exit(2);
-        }
-    }
-}
-
-fn parse(msg: &[u8]) {
-    match Message::parse(msg) {
-        Ok(message) => {
-            println!("Received: {:02x?} | {:?}", msg, message);
+    // set up the stream iterator
+    let mut stream = BufReader::new(port).bytes().map(|r| match r {
+        Ok(byte) => {
+            // upon yielding a byte, print it
+            print!("{:02x} ", byte);
+            byte
         }
         Err(err) => {
-            println!("Received: {:02x?} | PARSE ERROR: {}", msg, err);
+            eprintln!("Error while reading from serial port: {}", err);
+            process::exit(2);
+        }
+    });
+
+    loop {
+        print!("Read: ");
+        match Message::parse(&mut stream) {
+            Ok(msg) => println!("=> {:?}", msg),
+            Err(err) => {
+                println!("=> ERROR: {}", err);
+                if let MessageParseError::UnexpectedEnd = err {
+                    process::exit(2);
+                }
+            }
         }
     }
 }
