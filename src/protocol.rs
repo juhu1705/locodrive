@@ -155,7 +155,13 @@ mod args {
         }
 
         pub fn set_f(&mut self, f_num: u8, value: bool) {
-            self.0 |= if value { 1 } else { 0 } << (if f_num == 0 { 4 } else { f_num - 1 })
+            assert!(f_num <= 4, "f must be lower than or equal to 4");
+            let mask = 1 << if f_num == 0 { 4 } else { f_num - 1 };
+            if value {
+                self.0 |= mask;
+            } else {
+                self.0 &= !mask;
+            }
         }
     }
 
