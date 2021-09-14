@@ -72,7 +72,7 @@ mod args {
 
         pub fn set_address(&mut self, address: u16) {
             assert_eq!(
-                address & 0x03FF,
+                address & 0x07FF,
                 0,
                 "address must only use the 11 least significant bits"
             );
@@ -301,7 +301,7 @@ mod args {
 
         pub fn set_address(&mut self, address: u16) {
             assert_eq!(
-                address & 0x03FF,
+                address & 0x07FF,
                 0,
                 "address must only use the 11 least significant bits"
             );
@@ -310,7 +310,7 @@ mod args {
 
         pub fn set_address_ds54(&mut self, address_ds54: u16) {
             assert_eq!(
-                self.address & 0x07FF,
+                self.address & 0x0FFF,
                 0,
                 "address must only use the 12 least significant bits"
             );
