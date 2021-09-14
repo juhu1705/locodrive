@@ -431,6 +431,7 @@ impl Message {
         Err(MessageParseError::UnknownOpcode(opc))
     }
 
+    #[allow(unused_variables)] // TODO: remove allowance when parse_var is implemented
     fn parse_var(opc: u8, args: &[u8]) -> Result<Message, MessageParseError> {
         Err(MessageParseError::UnknownOpcode(opc))
     }
