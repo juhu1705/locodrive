@@ -90,10 +90,6 @@ mod args {
     pub struct SlotArg(u8);
 
     impl SlotArg {
-        pub fn new(number: u8) -> Self {
-            Self(number)
-        }
-
         pub fn parse(slot: u8) -> Self {
             Self(slot & 0x7F)
         }
@@ -474,7 +470,7 @@ impl Message {
             )),
             0xB0 => Ok(Self::SwReq(SwitchArg::parse(args[0], args[1]))),
             0xA1 => Ok(Self::LocoDirf(
-                SlotArg::new(args[0]),
+                SlotArg::parse(args[0]),
                 DirfArg::parse(args[1]),
             )),
             0xA0 => Ok(Self::LocoSpd(
