@@ -464,11 +464,11 @@ impl Message {
             )),
             0xB2 => Ok(Self::InputRep(InArg::parse(args[0], args[1]))),
             // TODO: 0xB1 => Ok(Self::SwRep(...))
+            0xB0 => Ok(Self::SwReq(SwitchArg::parse(args[0], args[1]))),
             0xA2 => Ok(Self::LocoSnd(
                 SlotArg::parse(args[0]),
                 SndArg::parse(args[1]),
             )),
-            0xB0 => Ok(Self::SwReq(SwitchArg::parse(args[0], args[1]))),
             0xA1 => Ok(Self::LocoDirf(
                 SlotArg::parse(args[0]),
                 DirfArg::parse(args[1]),
