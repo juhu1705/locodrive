@@ -3,6 +3,8 @@ use crate::protocol::args::*;
 
 mod args {
     use std::fmt::{Debug, Formatter};
+    use std::os::ios::raw::stat;
+    use crate::protocol::Message::Idle;
 
     #[derive(Debug, Copy, Clone)]
     pub struct AddressArg(u16);
@@ -207,6 +209,111 @@ mod args {
     }
 
     #[derive(Debug, Copy, Clone)]
+    pub struct StatArg {
+        spurge: bool,
+        consist: Consist,
+        state: State,
+        decoder_type: DecoderType,
+        has_adv: bool,
+        no_id_usage: bool,
+        id_encoded_alias: bool,
+    }
+
+    #[derive(Debug, Copy, Clone, PartialEq)]
+    pub enum Consist {
+        LogicalMid,
+        LogicalTop,
+        LogicalSubMember,
+        Free
+    }
+
+    #[derive(Debug, Copy, Clone, PartialEq)]
+    pub enum State {
+        InUse,
+        Idle,
+        Common,
+        Free
+    }
+
+    #[derive(Debug, Copy, Clone, PartialEq)]
+    pub enum DecoderType {
+        Dcc28,
+        Dcc128,
+        Regular28,
+        AdrMobile28,
+        Step14,
+        Speed128
+    }
+
+    impl StatArg {
+        pub fn parse(stat1: u8, stat2: u8) -> Self {
+            let spurge = stat1 & 0x80 != 0;
+
+            let consist = match stat1 & 0x48 {
+                0x48 => Consist::LogicalMid,
+                0x08 => Consist::LogicalTop,
+                0x40 => Consist::LogicalSubMember,
+                0x00 => Consist::Free,
+                _ => panic!("No valid consist is given!")
+            };
+
+            let state = match stat1 & 0x30 {
+                0x30 => State::InUse,
+                0x20 => State::Idle,
+                0x10 => State::Common,
+                0x00 => State::Free,
+                _ => panic!("No valid state is given!")
+            };
+
+            let decoder_type = match stat1 & 0x07 {
+                0x02 => DecoderType::Step14,
+                0x01 => DecoderType::AdrMobile28,
+                0x00 => DecoderType::Regular28,
+                0x03 => DecoderType::Speed128,
+                0x07 => DecoderType::Dcc128,
+                0x04 => DecoderType::Dcc28,
+                _ => panic!("The given decoder type was invalid!")
+            };
+
+            let has_adv = stat2 & 0x01 != 0;
+
+            let no_id_usage = stat2 & 0x04 != 0;
+
+            let id_encoded_alias = stat2 & 0x08 != 0;
+
+            StatArg(spurge, consist, state, decoder_type, has_adv, no_id_usage, id_encoded_alias)
+        }
+
+        pub fn spurge(&self) -> bool {
+            self.spurge
+        }
+
+        pub fn consist(&self) -> Consist {
+            self.consist
+        }
+
+        pub fn state (&self) -> State {
+            self.state
+        }
+
+        pub fn decoder_type(&self) -> DecoderType {
+            self.decoder_type
+        }
+
+        pub fn has_adv(&self) -> bool {
+            self.has_adv
+        }
+
+        pub fn no_id_usage(&self) -> bool {
+            self.no_id_usage
+        }
+
+        pub fn id_encoded_alias(&self) -> bool {
+            self.id_encoded_alias
+        }
+    }
+
+    #[derive(Debug, Copy, Clone)]
     pub struct LopcArg(u8);
 
     impl LopcArg {
@@ -338,6 +445,15 @@ mod args {
             )
         }
     }
+
+    #[derive(Debug, Copy, Clone)]
+    pub struct IdArg(u8, u8);
+
+    impl IdArg {
+        pub fn parse(id1: u8, id2: u8) {
+            IdArg(id1 & 0xF7, id2 & 0xF7);
+        }
+    }
 }
 
 #[repr(u8)]
@@ -364,6 +480,7 @@ pub enum Message {
     LocoSnd(SlotArg, SndArg) = 0xA2,
     LocoDirf(SlotArg, DirfArg) = 0xA1,
     LocoSpd(SlotArg, SpeedArg) = 0xA0,
+    // TODO: SlRdData(SlotArg, StatArg, AddressArg, SpeedArg, DirfArg, TrkStatArg, SndArg, IdArg) = 0xE7,
 }
 
 impl Message {
