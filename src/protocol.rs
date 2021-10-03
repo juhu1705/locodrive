@@ -179,6 +179,40 @@ mod args {
     }
 
     #[derive(Debug, Copy, Clone)]
+    pub struct TrkArg {
+        power: bool,
+        idle: bool,
+        mlok1: bool,
+        prog_busy: bool
+    }
+
+    impl TrkArg {
+        pub fn parse(trk_arg: u8) -> Self {
+            let power = trk_arg & 0x01 == 0x01;
+            let idle = trk_arg & 0x02 == 0x00;
+            let mlok1 = trk_arg & 0x03 == 0x03;
+            let prog_busy = trk_arg & 0x04 == 0x04;
+            TRKArg(power, idle, mlok1, prog_busy)
+        }
+
+        pub fn power_on(&self) -> bool {
+            self.power
+        }
+
+        pub fn track_idle(&self) -> bool {
+            self.idle
+        }
+
+        pub fn mlok1(&self) -> bool {
+            self.mlok1
+        }
+
+        pub fn prog_busy(&self) -> bool {
+            self.prog_busy
+        }
+    }
+
+    #[derive(Debug, Copy, Clone)]
     pub struct SndArg(u8);
 
     impl SndArg {
@@ -450,8 +484,8 @@ mod args {
     pub struct IdArg(u8, u8);
 
     impl IdArg {
-        pub fn parse(id1: u8, id2: u8) {
-            IdArg(id1 & 0xF7, id2 & 0xF7);
+        pub fn parse(id1: u8, id2: u8) -> Self {
+            IdArg(id1 & 0xF7, id2 & 0xF7)
         }
     }
 }
@@ -480,7 +514,7 @@ pub enum Message {
     LocoSnd(SlotArg, SndArg) = 0xA2,
     LocoDirf(SlotArg, DirfArg) = 0xA1,
     LocoSpd(SlotArg, SpeedArg) = 0xA0,
-    // TODO: SlRdData(SlotArg, StatArg, AddressArg, SpeedArg, DirfArg, TrkStatArg, SndArg, IdArg) = 0xE7,
+    SlRdData(SlotArg, StatArg, AddressArg, SpeedArg, DirfArg, TrkArg, SndArg, IdArg) = 0xE7,
 }
 
 impl Message {
@@ -605,6 +639,23 @@ impl Message {
 
     #[allow(unused_variables)] // TODO: remove allowance when parse_var is implemented
     fn parse_var(opc: u8, args: &[u8]) -> Result<Self, MessageParseError> {
+        assert_eq!(args.len(), args[0], "length of args mut be {:?}", args[0]);
+
+        match opc {
+            0xE7 =>
+                OK(Self::SlRdData(
+                    SlotArg::parse(args[1]),
+                    StatArg::parse(args[2], args[7]),
+                    AddressArg::parse(args[3], args[8]),
+                    SpeedArg::parse(args[4]),
+                    DirfArg::parse(args[5]),
+                    TrkArg::parse(args[6]),
+                    SndArg::parse(args[9]),
+                    IdArg::parse(args[10], args[11])
+                )),
+            _ => {}
+        }
+
         Err(MessageParseError::UnknownOpcode(opc))
     }
 
