@@ -188,11 +188,11 @@ mod args {
 
     impl TrkArg {
         pub fn parse(trk_arg: u8) -> Self {
-            let power = trk_arg & 0x10 == 0x10;
-            let idle = trk_arg & 0x20 == 0x00;
-            let mlok1 = trk_arg & 0x40 == 0x40;
-            let prog_busy = trk_arg & 0x80 == 0x80;
-            TRKArg(power, idle, mlok1, prog_busy)
+            let power = trk_arg & 0x01 == 0x01;
+            let idle = trk_arg & 0x02 == 0x00;
+            let mlok1 = trk_arg & 0x04 == 0x04;
+            let prog_busy = trk_arg & 0x08 == 0x08;
+            TrkArg(power, idle, mlok1, prog_busy)
         }
 
         pub fn power_on(&self) -> bool {
@@ -501,12 +501,12 @@ mod args {
     impl SnArg {
         pub fn parse(sn1: u8, sn2: u8) -> Self {
             let mut address = sn1 as u16;
-            address |= (sn2 as u16 & 0xF0) << 7;
+            address |= (sn2 as u16 & 0x0F) << 7;
 
-            let format = sn2 & 0x04 == 0x04;
+            let format = sn2 & 0x20 == 0x20;
 
-            let c = sn2 & 0x02 == 0x02;
-            let t = sn2 & 0x01 == 0x01;
+            let c = sn2 & 0x40 == 0x40;
+            let t = sn2 & 0x80 == 0x80;
 
             SnArg(address, format, c, t)
         }
