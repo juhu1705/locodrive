@@ -188,10 +188,10 @@ mod args {
 
     impl TrkArg {
         pub fn parse(trk_arg: u8) -> Self {
-            let power = trk_arg & 0x01 == 0x01;
-            let idle = trk_arg & 0x02 == 0x00;
-            let mlok1 = trk_arg & 0x03 == 0x03;
-            let prog_busy = trk_arg & 0x04 == 0x04;
+            let power = trk_arg & 0x10 == 0x10;
+            let idle = trk_arg & 0x20 == 0x00;
+            let mlok1 = trk_arg & 0x40 == 0x40;
+            let prog_busy = trk_arg & 0x80 == 0x80;
             TRKArg(power, idle, mlok1, prog_busy)
         }
 
@@ -243,14 +243,11 @@ mod args {
     }
 
     #[derive(Debug, Copy, Clone)]
-    pub struct StatArg {
+    pub struct Stat1Arg {
         spurge: bool,
         consist: Consist,
         state: State,
-        decoder_type: DecoderType,
-        has_adv: bool,
-        no_id_usage: bool,
-        id_encoded_alias: bool,
+        decoder_type: DecoderType
     }
 
     #[derive(Debug, Copy, Clone, PartialEq)]
@@ -279,8 +276,8 @@ mod args {
         Speed128
     }
 
-    impl StatArg {
-        pub fn parse(stat1: u8, stat2: u8) -> Self {
+    impl Stat1Arg {
+        pub fn parse(stat1: u8) -> Self {
             let spurge = stat1 & 0x80 != 0;
 
             let consist = match stat1 & 0x48 {
@@ -309,13 +306,7 @@ mod args {
                 _ => panic!("The given decoder type was invalid!")
             };
 
-            let has_adv = stat2 & 0x01 != 0;
-
-            let no_id_usage = stat2 & 0x04 != 0;
-
-            let id_encoded_alias = stat2 & 0x08 != 0;
-
-            StatArg(spurge, consist, state, decoder_type, has_adv, no_id_usage, id_encoded_alias)
+            StatArg(spurge, consist, state, decoder_type)
         }
 
         pub fn spurge(&self) -> bool {
@@ -332,6 +323,25 @@ mod args {
 
         pub fn decoder_type(&self) -> DecoderType {
             self.decoder_type
+        }
+    }
+
+    #[derive(Debug, Copy, Clone)]
+    pub struct Stat2Arg {
+        has_adv: bool,
+        no_id_usage: bool,
+        id_encoded_alias: bool,
+    }
+
+    impl Stat2Arg {
+        pub fn parse(stat2: u8) -> Self {
+            let has_adv = stat2 & 0x01 != 0;
+
+            let no_id_usage = stat2 & 0x04 != 0;
+
+            let id_encoded_alias = stat2 & 0x08 != 0;
+
+            Stat2Arg(has_adv, no_id_usage, id_encoded_alias)
         }
 
         pub fn has_adv(&self) -> bool {
@@ -481,6 +491,29 @@ mod args {
     }
 
     #[derive(Debug, Copy, Clone)]
+    pub struct SnArg {
+        address: u16,
+        format: bool,
+        c: bool,
+        t: bool
+    }
+
+    impl SnArg {
+        pub fn parse(sn1: u8, sn2: u8) -> Self {
+            let mut address = sn1 as u16;
+            address |= (sn2 as u16 & 0xF0) << 7;
+
+            let format = sn2 & 0x04 == 0x04;
+
+            let c = sn2 & 0x02 == 0x02;
+            let t = sn2 & 0x01 == 0x01;
+
+            SnArg(address, format, c, t)
+        }
+    }
+
+
+    #[derive(Debug, Copy, Clone)]
     pub struct IdArg(u8, u8);
 
     impl IdArg {
@@ -506,15 +539,15 @@ pub enum Message {
     LinkSlots(SlotArg, SlotArg) = 0xB9,
     UnlinkSlots(SlotArg, SlotArg) = 0xB8,
     ConsistFunc(SlotArg, DirfArg) = 0xB6,
-    // TODO: SlotStat1 0xB5
+    SlotStat1(SlotArg, Stat1Arg) = 0xB5,
     LongAck(LopcArg, Ack1Arg) = 0xB4,
     InputRep(InArg) = 0xB2,
-    // TODO: SwRep 0xB1
+    SwRep(SnArg) = 0xB1,
     SwReq(SwitchArg) = 0xB0,
     LocoSnd(SlotArg, SndArg) = 0xA2,
     LocoDirf(SlotArg, DirfArg) = 0xA1,
     LocoSpd(SlotArg, SpeedArg) = 0xA0,
-    SlRdData(SlotArg, StatArg, AddressArg, SpeedArg, DirfArg, TrkArg, SndArg, IdArg) = 0xE7,
+    SlRdData(SlotArg, Stat1Arg, AddressArg, SpeedArg, DirfArg, TrkArg, Stat2Arg, SndArg, IdArg) = 0xE7,
 }
 
 impl Message {
@@ -608,13 +641,16 @@ impl Message {
                 SlotArg::parse(args[0]),
                 DirfArg::parse(args[1]),
             )),
-            // TODO: 0xB5 => Ok(Self::SlotStat1(...))
+            0xB5 => Ok(Self::SlotStat1(
+                SlotArg::parse(args[0]),
+                Stat1Arg::parse(args[1])
+            )),
             0xB4 => Ok(Self::LongAck(
                 LopcArg::parse(args[0]),
                 Ack1Arg::parse(args[1]),
             )),
             0xB2 => Ok(Self::InputRep(InArg::parse(args[0], args[1]))),
-            // TODO: 0xB1 => Ok(Self::SwRep(...))
+            0xB1 => Ok(Self::SwRep(SnArg::parse(args[0], args[1]))),
             0xB0 => Ok(Self::SwReq(SwitchArg::parse(args[0], args[1]))),
             0xA2 => Ok(Self::LocoSnd(
                 SlotArg::parse(args[0]),
@@ -645,18 +681,17 @@ impl Message {
             0xE7 =>
                 OK(Self::SlRdData(
                     SlotArg::parse(args[1]),
-                    StatArg::parse(args[2], args[7]),
+                    Stat1Arg::parse(args[2]),
                     AddressArg::parse(args[3], args[8]),
                     SpeedArg::parse(args[4]),
                     DirfArg::parse(args[5]),
                     TrkArg::parse(args[6]),
+                    Stat2Arg::parse(args[7]),
                     SndArg::parse(args[9]),
                     IdArg::parse(args[10], args[11])
                 )),
-            _ => {}
+            _ => Err(MessageParseError::UnknownOpcode(opc))
         }
-
-        Err(MessageParseError::UnknownOpcode(opc))
     }
 
     fn validate(msg: &[u8]) -> bool {
