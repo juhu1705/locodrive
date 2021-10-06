@@ -1,5 +1,6 @@
 use crate::error::MessageParseError;
 use crate::protocol::args::*;
+use crate::protocol::Message::{MultiSense, UhliFun};
 
 mod args {
     use std::fmt::{Debug, Formatter};
@@ -521,6 +522,46 @@ mod args {
             IdArg(id1 & 0xF7, id2 & 0xF7)
         }
     }
+
+    #[derive(Debug, Copy, Clone)]
+    pub struct MTypeArg(u8);
+
+    impl MTypeArg {
+        pub fn parse(m_type: u8) -> Self {
+            MTypeArg(m_type)
+        }
+    }
+
+    #[derive(Debug, Copy, Clone)]
+    pub struct ZasArg(u8);
+
+    impl ZasArg {
+        pub fn parse(zone_and_section: u8) -> Self {
+            ZasArg(zone_and_section)
+        }
+    }
+
+    #[derive(Debug, Copy, Clone)]
+    pub struct SenseAddrArg(u16);
+
+    impl SenseAddrArg {
+        pub fn parse(addr1: u8, addr2: u8) -> Self {
+            let mut address = addr1 as u16;
+            address |= (addr2 as u16) << 7;
+
+            SenseAddrArg(address)
+        }
+    }
+
+    #[derive(Debug, Copy, Clone)]
+    pub struct FunctionArg(u8, u8);
+
+    impl FunctionArg {
+        pub fn parse(group: u8, function: u8) -> Self {
+            FunctionArg(group, function)
+        }
+    }
+
 }
 
 #[repr(u8)]
@@ -547,7 +588,13 @@ pub enum Message {
     LocoSnd(SlotArg, SndArg) = 0xA2,
     LocoDirf(SlotArg, DirfArg) = 0xA1,
     LocoSpd(SlotArg, SpeedArg) = 0xA0,
+    MultiSense(MTypeArg, ZasArg, SenseAddrArg) = 0xD0,
+    UhliFun(SlotArg, FunctionArg) = 0xD4,
+    // WrSlData(WrSlDataArg) = 0xEF,
     SlRdData(SlotArg, Stat1Arg, AddressArg, SpeedArg, DirfArg, TrkArg, Stat2Arg, SndArg, IdArg) = 0xE7,
+    // PeerXfer() = 0xE5,
+    // LissyRep() = 0xE4,
+    // ImmPacket() = 0xED,
 }
 
 impl Message {
@@ -670,13 +717,28 @@ impl Message {
 
     fn parse6(opc: u8, args: &[u8]) -> Result<Self, MessageParseError> {
         assert_eq!(args.len(), 4, "length of args mut be 4");
-        Err(MessageParseError::UnknownOpcode(opc))
+        match opc {
+            0xD0 =>
+                Ok(MultiSense(
+                    MTypeArg::parse(args[0]),
+                    ZasArg::parse(args[1]),
+                    SenseAddrArg::parse(args[2], args[3])
+                )),
+            0xD4 =>
+                {
+                    assert_eq!(0x20, args[0], "Value of arg0 can only be {:?}", 0x20);
+                    Ok(UhliFun(
+                        SlotArg::parse(args[1]),
+                        FunctionArg::parse(args[2], args[3]),
+                    ))
+                },
+            _ => Err(MessageParseError::UnknownOpcode(opc))
+        }
     }
 
     #[allow(unused_variables)] // TODO: remove allowance when parse_var is implemented
     fn parse_var(opc: u8, args: &[u8]) -> Result<Self, MessageParseError> {
         assert_eq!(args.len(), args[0], "length of args mut be {:?}", args[0]);
-
         match opc {
             0xE7 =>
                 OK(Self::SlRdData(
