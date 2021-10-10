@@ -392,6 +392,18 @@ mod args {
             self.0 != 0
         }
 
+        pub fn is_busy(&self) -> bool {
+            self.0 == 0
+        }
+
+        pub fn accepted(&self) -> bool {
+            self.0 == 1
+        }
+
+        pub fn accepted_blind(&self) -> bool {
+            self.0 == 0x40
+        }
+
         pub fn set_code(&mut self, code: u8) {
             self.0 = code
         }
@@ -554,12 +566,110 @@ mod args {
     }
 
     #[derive(Debug, Copy, Clone)]
-    pub struct FunctionArg(u8, u8);
+    pub struct FunctionArg(u8);
 
     impl FunctionArg {
         pub fn parse(group: u8, function: u8) -> Self {
-            FunctionArg(group, function)
+            assert_eq!(0x07, group, "Value of group can only be {:?}", 0x07);
+            FunctionArg(function)
         }
+
+        pub fn f(&self, f_num: u8) -> bool {
+            assert!(f_num >= 9 && f_num <= 11, "f must be lower than or equal to 4");
+            self.0 >> (f_num - 9) & 1 != 0
+        }
+
+        pub fn set_f(&mut self, f_num: u8, value: bool) {
+            assert!(f_num <= 4, "f must be lower than or equal to 4");
+            let mask = 1 << (f_num - 9);
+            if value {
+                self.0 |= mask;
+            } else {
+                self.0 &= !mask;
+            }
+        }
+    }
+
+    impl Debug for FunctionArg {
+        fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+            write!(
+                f,
+                "DirfArg(f9: {}, f10: {}, f11: {})",
+                self.f(9),
+                self.f(10),
+                self.f(11),
+            )
+        }
+    }
+
+    #[derive(Debug, Copy, Clone)]
+    pub struct Pcmd {
+        write: bool,
+        byte_mode: bool,
+        ops_mode: bool,
+        ty1: bool, // Programing type select bit
+        ty2: bool, // prog type select bit
+    }
+
+    impl Pcmd {
+        pub fn parse(pcmd: u8) -> Self {
+            let write = pcmd & 0x20 == 0x20;
+            let byte_mode = pcmd & 0x40 == 0x40;
+            let ops_mode = pcmd & 0x02 == 0x02;
+            let ty1 = pcmd & 0x80 == 0x80;
+            let ty2 = pcmd & 0x01 == 0x01;
+
+            Pcmd(write, byte_mode, ops_mode, ty1, ty2)
+        }
+    }
+
+    #[derive(Debug, Copy, Clone)]
+    pub struct PStat {
+        user_aborted: bool,
+        no_read_ack: bool,
+        no_write_ack: bool,
+        programming_track_empty: bool
+    }
+
+    impl PStat {
+        pub fn parse(stat: u8) -> Self {
+            let user_aborted = stat & 0x01 == 0x01;
+            let no_read_ack = stat & 0x02 == 0x02;
+            let no_write_ack = stat & 0x04 == 0x04;
+            let programming_track_empty = stat & 0x08 == 0x08;
+
+            PStat(user_aborted, no_read_ack, no_write_ack, programming_track_empty)
+        }
+    }
+
+    #[derive(Debug, Copy, Clone)]
+    pub struct Hopsa(u8);
+
+    impl Hopsa {
+
+        pub fn parse(o_mode: u8) -> Self {
+            Hopsa(o_mode & 0xEF) // TODO: Must be rechecked by Nomino
+        }
+
+        pub fn service_mode(&self) -> bool {
+            self.0 == 0
+        }
+
+    }
+
+    #[derive(Debug, Copy, Clone)]
+    pub struct Lopsa(u8);
+
+    impl Lopsa {
+
+        pub fn parse(o_mode: u8) -> Self {
+            Lopsa(o_mode & 0xEF) // TODO: Must be rechecked by Nomino
+        }
+
+        pub fn service_mode(&self) -> bool {
+            self.0 == 0
+        }
+
     }
 
 }
@@ -590,7 +700,7 @@ pub enum Message {
     LocoSpd(SlotArg, SpeedArg) = 0xA0,
     MultiSense(MTypeArg, ZasArg, SenseAddrArg) = 0xD0,
     UhliFun(SlotArg, FunctionArg) = 0xD4,
-    // WrSlData(WrSlDataArg) = 0xEF,
+    WrSlData(WrSlDataArg) = 0xEF,
     SlRdData(SlotArg, Stat1Arg, AddressArg, SpeedArg, DirfArg, TrkArg, Stat2Arg, SndArg, IdArg) = 0xE7,
     // PeerXfer() = 0xE5,
     // LissyRep() = 0xE4,
