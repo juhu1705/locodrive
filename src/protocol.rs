@@ -648,7 +648,7 @@ mod args {
     impl Hopsa {
 
         pub fn parse(o_mode: u8) -> Self {
-            Hopsa(o_mode & 0xEF) // TODO: Must be rechecked by Nomino
+            Hopsa(o_mode & 0x7F)
         }
 
         pub fn service_mode(&self) -> bool {
@@ -663,13 +663,118 @@ mod args {
     impl Lopsa {
 
         pub fn parse(o_mode: u8) -> Self {
-            Lopsa(o_mode & 0xEF) // TODO: Must be rechecked by Nomino
+            Lopsa(o_mode & 0x7F)
         }
 
         pub fn service_mode(&self) -> bool {
             self.0 == 0
         }
 
+    }
+
+    #[derive(Debug, Copy, Clone)]
+    pub struct CvArg(u16);
+
+    impl CvArg {
+
+        pub fn parse(cvh: u8, cvl: u8) -> Self {
+            let mut cv_arg = cvl as u16;
+
+            let mut data_arg = (cvh & 0x02) >> 1;
+            let mut high_cv_arg = (cvh & 0x01);
+            high_cv_arg |= (cvh & 0x30) >> 3;
+            high_cv_arg |= (data_arg) << 3;
+
+            cv_arg |= (high_cv_arg as u16) << 7;
+
+            CvArg(cv_arg)
+        }
+
+        pub fn data7(&self) -> bool {
+            self.0 & 0x0800 != 0
+        }
+
+        pub fn cv(&self, cv_num: u8) -> bool {
+            assert!(cv_num <= 9, "cv must be lower than or equal to 9");
+            self.0 >> cv_num & 1 != 0
+        }
+
+        pub fn set_data7(&mut self, value: bool) {
+            if value {
+                self.0 |= 0x0800;
+            } else {
+                self.0 &= !0x0800;
+            }
+        }
+
+        pub fn set_cv(&mut self, cv_num: u8, value: bool) {
+            assert!(cv_num <= 9, "cv must be lower than or equal to 9");
+            let mask = 1 << cv_num;
+            if value {
+                self.0 |= mask;
+            } else {
+                self.0 &= !mask;
+            }
+        }
+    }
+
+    impl Debug for CvArg {
+        fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+            write!(
+                f,
+                "CvArg(data7: {}, cv0: {}, cv1: {}, cv2: {}, cv3: {}, cv4: {}, cv5: {}, cv6: {}, cv7: {}, cv8: {})",
+                self.data7(),
+                self.cv(0),
+                self.cv(1),
+                self.cv(2),
+                self.cv(3),
+                self.cv(4),
+                self.cv(5),
+                self.cv(6),
+                self.cv(7),
+                self.cv(8),
+            )
+        }
+    }
+
+    #[derive(Debug, Copy, Clone)]
+    pub struct DataArg(u8);
+
+    impl DataArg {
+        pub fn parse(data: u8) -> Self {
+            DataArg(data)
+        }
+
+        pub fn d(&self, d_num: u8) -> bool {
+            assert!(d_num <= 6, "d must be lower than or equal to 6");
+            self.0 >> d_num & 1 != 0
+        }
+
+        pub fn set_d(&mut self, d_num: u8, value: bool) {
+            assert!(d_num <= 6, "d must be lower than or equal to 6");
+            let mask = 1 << d_num;
+            if value {
+                self.0 |= mask;
+            } else {
+                self.0 &= !mask;
+            }
+        }
+    }
+
+    impl Debug for DataArg {
+        fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+            write!(
+                f,
+                "DataArg(d0: {}, d1: {}, d2: {}, d3: {}, d4: {}, d5: {}, d6: {})",
+                self.d(0),
+                self.d(1),
+                self.d(2),
+                self.d(3),
+                self.d(4),
+                self.d(5),
+                self.d(6),
+            )
+        }
     }
 
 }
@@ -700,7 +805,7 @@ pub enum Message {
     LocoSpd(SlotArg, SpeedArg) = 0xA0,
     MultiSense(MTypeArg, ZasArg, SenseAddrArg) = 0xD0,
     UhliFun(SlotArg, FunctionArg) = 0xD4,
-    WrSlData(WrSlDataArg) = 0xEF,
+    WrSlData() = 0xEF,
     SlRdData(SlotArg, Stat1Arg, AddressArg, SpeedArg, DirfArg, TrkArg, Stat2Arg, SndArg, IdArg) = 0xE7,
     // PeerXfer() = 0xE5,
     // LissyRep() = 0xE4,
