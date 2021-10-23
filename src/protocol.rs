@@ -1,10 +1,10 @@
 use crate::error::MessageParseError;
 use crate::protocol::args::*;
-use crate::protocol::Message::{MultiSense, UhliFun};
 
 mod args {
     use std::fmt::{Debug, Formatter};
     use std::os::ios::raw::stat;
+    use std::time::Duration;
     use crate::protocol::Message::Idle;
 
     #[derive(Debug, Copy, Clone)]
@@ -777,6 +777,47 @@ mod args {
         }
     }
 
+    #[derive(Debug, Copy, Clone)]
+    pub struct ClkRateArg(u8);
+
+    impl ClkRateArg {
+        pub fn parse(clk_rate: u8) -> Self {
+            ClkRateArg(clk_rate & 0x7F)
+        }
+
+        pub fn set_rate(&mut self, clk_rate: u8) {
+            if clk_rate > 0x7F {
+                assert!("Clock rate {} is to high. Only values up to 0x7F are allowed");
+            }
+            self.0 = clk_rate & 0x7F;
+        }
+
+        pub fn get_rate(&self) -> u8 {
+            self.0
+        }
+    }
+
+    #[derive(Debug, Copy, Clone)]
+    pub struct FastClock {
+        clk_rate: u8,
+        frac: u8,
+        duration: Duration,
+        clk_cntrl: u8
+    }
+
+    impl FastClock {
+        pub fn parse(clk_rate: u8, frac: u8, mins: u8, hours: u8, days: u8, clk_cntrl: u8) -> Self {
+            let min = 256 - mins % 60 as u64;
+            let hour = 256 - hours % 60 as u64;
+
+            let secs : u64 = min as u64 * 60 + hour as u64 * 60 * 60 + days as u64 * 24 * 60 * 60;
+
+            let duration = Duration::new(secs, 0);
+
+            FastClock(clk_rate & 0x7F, frac, duration, clk_cntrl)
+        }
+    }
+
 }
 
 #[repr(u8)]
@@ -934,7 +975,7 @@ impl Message {
         assert_eq!(args.len(), 4, "length of args mut be 4");
         match opc {
             0xD0 =>
-                Ok(MultiSense(
+                Ok(Self::MultiSense(
                     MTypeArg::parse(args[0]),
                     ZasArg::parse(args[1]),
                     SenseAddrArg::parse(args[2], args[3])
@@ -942,7 +983,7 @@ impl Message {
             0xD4 =>
                 {
                     assert_eq!(0x20, args[0], "Value of arg0 can only be {:?}", 0x20);
-                    Ok(UhliFun(
+                    Ok(Self::UhliFun(
                         SlotArg::parse(args[1]),
                         FunctionArg::parse(args[2], args[3]),
                     ))
