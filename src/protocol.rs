@@ -3,9 +3,7 @@ use crate::protocol::args::*;
 
 mod args {
     use std::fmt::{Debug, Formatter};
-    use std::os::ios::raw::stat;
     use std::time::Duration;
-    use crate::protocol::Message::Idle;
 
     #[derive(Debug, Copy, Clone)]
     pub struct AddressArg(u16);
@@ -193,7 +191,12 @@ mod args {
             let idle = trk_arg & 0x02 == 0x00;
             let mlok1 = trk_arg & 0x04 == 0x04;
             let prog_busy = trk_arg & 0x08 == 0x08;
-            TrkArg(power, idle, mlok1, prog_busy)
+            TrkArg{
+                power,
+                idle,
+                mlok1,
+                prog_busy
+            }
         }
 
         pub fn power_on(&self) -> bool {
@@ -307,7 +310,7 @@ mod args {
                 _ => panic!("The given decoder type was invalid!")
             };
 
-            StatArg(spurge, consist, state, decoder_type)
+            Stat1Arg { spurge, consist, state, decoder_type }
         }
 
         pub fn spurge(&self) -> bool {
@@ -342,7 +345,7 @@ mod args {
 
             let id_encoded_alias = stat2 & 0x08 != 0;
 
-            Stat2Arg(has_adv, no_id_usage, id_encoded_alias)
+            Stat2Arg{ has_adv, no_id_usage, id_encoded_alias }
         }
 
         pub fn has_adv(&self) -> bool {
@@ -521,7 +524,7 @@ mod args {
             let c = sn2 & 0x40 == 0x40;
             let t = sn2 & 0x80 == 0x80;
 
-            SnArg(address, format, c, t)
+            SnArg{ address, format, c, t }
         }
     }
 
@@ -565,27 +568,40 @@ mod args {
         }
     }
 
-    #[derive(Debug, Copy, Clone)]
-    pub struct FunctionArg(u8);
+    #[derive(Copy, Clone)]
+    pub struct FunctionArg(u8, u8);
 
     impl FunctionArg {
         pub fn parse(group: u8, function: u8) -> Self {
-            assert_eq!(0x07, group, "Value of group can only be {:?}", 0x07);
-            FunctionArg(function)
+            FunctionArg(group, function)
         }
 
         pub fn f(&self, f_num: u8) -> bool {
-            assert!(f_num >= 9 && f_num <= 11, "f must be lower than or equal to 4");
-            self.0 >> (f_num - 9) & 1 != 0
+            if f_num > 8 && f_num < 12 && self.0 == 0x07 {
+                (self.1 >> (f_num - 9) & 1) != 0
+            } else if (f_num == 12 || f_num == 20 || f_num == 28) && self.0 == 0x05 {
+                (self.1 >> (if f_num == 12 { 0 } else if f_num == 20 { 1 } else { 2 }) & 1) != 0
+            } else if f_num > 12 && f_num < 20 && self.0 == 0x08 {
+                //TODO: Not Correct
+                (self.1 >> (f_num - 13) & 1) != 0
+            } else if f_num > 20 && f_num < 28 && self.0 == 0x09 {
+                //TODO: Not Correct
+                (self.1 >> (f_num - 13) & 1) != 0
+            } else {
+                false
+            }
+
+
+
         }
 
         pub fn set_f(&mut self, f_num: u8, value: bool) {
             assert!(f_num <= 4, "f must be lower than or equal to 4");
             let mask = 1 << (f_num - 9);
             if value {
-                self.0 |= mask;
+                self.1 |= mask;
             } else {
-                self.0 &= !mask;
+                self.1 &= !mask;
             }
         }
     }
@@ -619,7 +635,7 @@ mod args {
             let ty1 = pcmd & 0x80 == 0x80;
             let ty2 = pcmd & 0x01 == 0x01;
 
-            Pcmd(write, byte_mode, ops_mode, ty1, ty2)
+            Pcmd{ write, byte_mode, ops_mode, ty1, ty2 }
         }
     }
 
@@ -638,7 +654,7 @@ mod args {
             let no_write_ack = stat & 0x04 == 0x04;
             let programming_track_empty = stat & 0x08 == 0x08;
 
-            PStat(user_aborted, no_read_ack, no_write_ack, programming_track_empty)
+            PStat{ user_aborted, no_read_ack, no_write_ack, programming_track_empty }
         }
     }
 
@@ -672,7 +688,7 @@ mod args {
 
     }
 
-    #[derive(Debug, Copy, Clone)]
+    #[derive(Copy, Clone)]
     pub struct CvArg(u16);
 
     impl CvArg {
@@ -680,8 +696,8 @@ mod args {
         pub fn parse(cvh: u8, cvl: u8) -> Self {
             let mut cv_arg = cvl as u16;
 
-            let mut data_arg = (cvh & 0x02) >> 1;
-            let mut high_cv_arg = (cvh & 0x01);
+            let data_arg = (cvh & 0x02) >> 1;
+            let mut high_cv_arg = cvh & 0x01;
             high_cv_arg |= (cvh & 0x30) >> 3;
             high_cv_arg |= (data_arg) << 3;
 
@@ -737,7 +753,7 @@ mod args {
         }
     }
 
-    #[derive(Debug, Copy, Clone)]
+    #[derive(Copy, Clone)]
     pub struct DataArg(u8);
 
     impl DataArg {
@@ -786,9 +802,8 @@ mod args {
         }
 
         pub fn set_rate(&mut self, clk_rate: u8) {
-            if clk_rate > 0x7F {
-                assert!("Clock rate {} is to high. Only values up to 0x7F are allowed");
-            }
+            assert!(clk_rate > 0x7F, "Clock rate {:?} is to high. Only values up to 0x7F are allowed", clk_rate);
+
             self.0 = clk_rate & 0x7F;
         }
 
@@ -807,14 +822,14 @@ mod args {
 
     impl FastClock {
         pub fn parse(clk_rate: u8, frac: u8, mins: u8, hours: u8, days: u8, clk_cntrl: u8) -> Self {
-            let min = 256 - mins % 60 as u64;
-            let hour = 256 - hours % 60 as u64;
+            let min = 0xFF - mins % 60;
+            let hour = 0xFF - hours % 60;
 
             let secs : u64 = min as u64 * 60 + hour as u64 * 60 * 60 + days as u64 * 24 * 60 * 60;
 
             let duration = Duration::new(secs, 0);
 
-            FastClock(clk_rate & 0x7F, frac, duration, clk_cntrl)
+            FastClock{ clk_rate: clk_rate & 0x7F, frac, duration, clk_cntrl }
         }
     }
 
@@ -994,10 +1009,10 @@ impl Message {
 
     #[allow(unused_variables)] // TODO: remove allowance when parse_var is implemented
     fn parse_var(opc: u8, args: &[u8]) -> Result<Self, MessageParseError> {
-        assert_eq!(args.len(), args[0], "length of args mut be {:?}", args[0]);
+        assert_eq!(args.len() as u8, args[0], "length of args mut be {:?}", args[0]);
         match opc {
             0xE7 =>
-                OK(Self::SlRdData(
+                Ok(Self::SlRdData(
                     SlotArg::parse(args[1]),
                     Stat1Arg::parse(args[2]),
                     AddressArg::parse(args[3], args[8]),
