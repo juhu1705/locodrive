@@ -182,7 +182,7 @@ mod args {
         power: bool,
         idle: bool,
         mlok1: bool,
-        prog_busy: bool
+        prog_busy: bool,
     }
 
     impl TrkArg {
@@ -191,11 +191,11 @@ mod args {
             let idle = trk_arg & 0x02 == 0x00;
             let mlok1 = trk_arg & 0x04 == 0x04;
             let prog_busy = trk_arg & 0x08 == 0x08;
-            TrkArg{
+            TrkArg {
                 power,
                 idle,
                 mlok1,
-                prog_busy
+                prog_busy,
             }
         }
 
@@ -251,7 +251,7 @@ mod args {
         spurge: bool,
         consist: Consist,
         state: State,
-        decoder_type: DecoderType
+        decoder_type: DecoderType,
     }
 
     #[derive(Debug, Copy, Clone, PartialEq)]
@@ -259,7 +259,7 @@ mod args {
         LogicalMid,
         LogicalTop,
         LogicalSubMember,
-        Free
+        Free,
     }
 
     #[derive(Debug, Copy, Clone, PartialEq)]
@@ -267,7 +267,7 @@ mod args {
         InUse,
         Idle,
         Common,
-        Free
+        Free,
     }
 
     #[derive(Debug, Copy, Clone, PartialEq)]
@@ -277,7 +277,7 @@ mod args {
         Regular28,
         AdrMobile28,
         Step14,
-        Speed128
+        Speed128,
     }
 
     impl Stat1Arg {
@@ -289,7 +289,7 @@ mod args {
                 0x08 => Consist::LogicalTop,
                 0x40 => Consist::LogicalSubMember,
                 0x00 => Consist::Free,
-                _ => panic!("No valid consist is given!")
+                _ => panic!("No valid consist is given!"),
             };
 
             let state = match stat1 & 0x30 {
@@ -297,7 +297,7 @@ mod args {
                 0x20 => State::Idle,
                 0x10 => State::Common,
                 0x00 => State::Free,
-                _ => panic!("No valid state is given!")
+                _ => panic!("No valid state is given!"),
             };
 
             let decoder_type = match stat1 & 0x07 {
@@ -307,10 +307,15 @@ mod args {
                 0x03 => DecoderType::Speed128,
                 0x07 => DecoderType::Dcc128,
                 0x04 => DecoderType::Dcc28,
-                _ => panic!("The given decoder type was invalid!")
+                _ => panic!("The given decoder type was invalid!"),
             };
 
-            Stat1Arg { spurge, consist, state, decoder_type }
+            Stat1Arg {
+                spurge,
+                consist,
+                state,
+                decoder_type,
+            }
         }
 
         pub fn spurge(&self) -> bool {
@@ -321,7 +326,7 @@ mod args {
             self.consist
         }
 
-        pub fn state (&self) -> State {
+        pub fn state(&self) -> State {
             self.state
         }
 
@@ -345,7 +350,11 @@ mod args {
 
             let id_encoded_alias = stat2 & 0x08 != 0;
 
-            Stat2Arg{ has_adv, no_id_usage, id_encoded_alias }
+            Stat2Arg {
+                has_adv,
+                no_id_usage,
+                id_encoded_alias,
+            }
         }
 
         pub fn has_adv(&self) -> bool {
@@ -511,7 +520,7 @@ mod args {
         address: u16,
         format: bool,
         c: bool,
-        t: bool
+        t: bool,
     }
 
     impl SnArg {
@@ -524,10 +533,14 @@ mod args {
             let c = sn2 & 0x40 == 0x40;
             let t = sn2 & 0x80 == 0x80;
 
-            SnArg{ address, format, c, t }
+            SnArg {
+                address,
+                format,
+                c,
+                t,
+            }
         }
     }
-
 
     #[derive(Debug, Copy, Clone)]
     pub struct IdArg(u8, u8);
@@ -580,19 +593,23 @@ mod args {
             if f_num > 8 && f_num < 12 && self.0 == 0x07 {
                 (self.1 >> (f_num - 9) & 1) != 0
             } else if (f_num == 12 || f_num == 20 || f_num == 28) && self.0 == 0x05 {
-                (self.1 >> (if f_num == 12 { 0 } else if f_num == 20 { 1 } else { 2 }) & 1) != 0
+                (self.1
+                    >> (if f_num == 12 {
+                        0
+                    } else if f_num == 20 {
+                        1
+                    } else {
+                        2
+                    })
+                    & 1)
+                    != 0
             } else if f_num > 12 && f_num < 20 && self.0 == 0x08 {
-                //TODO: Not Correct
                 (self.1 >> (f_num - 13) & 1) != 0
             } else if f_num > 20 && f_num < 28 && self.0 == 0x09 {
-                //TODO: Not Correct
-                (self.1 >> (f_num - 13) & 1) != 0
+                (self.1 >> (f_num - 21) & 1) != 0
             } else {
                 false
             }
-
-
-
         }
 
         pub fn set_f(&mut self, f_num: u8, value: bool) {
@@ -635,7 +652,13 @@ mod args {
             let ty1 = pcmd & 0x80 == 0x80;
             let ty2 = pcmd & 0x01 == 0x01;
 
-            Pcmd{ write, byte_mode, ops_mode, ty1, ty2 }
+            Pcmd {
+                write,
+                byte_mode,
+                ops_mode,
+                ty1,
+                ty2,
+            }
         }
     }
 
@@ -644,7 +667,7 @@ mod args {
         user_aborted: bool,
         no_read_ack: bool,
         no_write_ack: bool,
-        programming_track_empty: bool
+        programming_track_empty: bool,
     }
 
     impl PStat {
@@ -654,7 +677,12 @@ mod args {
             let no_write_ack = stat & 0x04 == 0x04;
             let programming_track_empty = stat & 0x08 == 0x08;
 
-            PStat{ user_aborted, no_read_ack, no_write_ack, programming_track_empty }
+            PStat {
+                user_aborted,
+                no_read_ack,
+                no_write_ack,
+                programming_track_empty,
+            }
         }
     }
 
@@ -662,7 +690,6 @@ mod args {
     pub struct Hopsa(u8);
 
     impl Hopsa {
-
         pub fn parse(o_mode: u8) -> Self {
             Hopsa(o_mode & 0xEF) // TODO: Must be rechecked by Nomino
         }
@@ -670,14 +697,12 @@ mod args {
         pub fn service_mode(&self) -> bool {
             self.0 == 0
         }
-
     }
 
     #[derive(Debug, Copy, Clone)]
     pub struct Lopsa(u8);
 
     impl Lopsa {
-
         pub fn parse(o_mode: u8) -> Self {
             Lopsa(o_mode & 0xEF) // TODO: Must be rechecked by Nomino
         }
@@ -685,14 +710,12 @@ mod args {
         pub fn service_mode(&self) -> bool {
             self.0 == 0
         }
-
     }
 
     #[derive(Copy, Clone)]
     pub struct CvArg(u16);
 
     impl CvArg {
-
         pub fn parse(cvh: u8, cvl: u8) -> Self {
             let mut cv_arg = cvl as u16;
 
@@ -802,7 +825,11 @@ mod args {
         }
 
         pub fn set_rate(&mut self, clk_rate: u8) {
-            assert!(clk_rate > 0x7F, "Clock rate {:?} is to high. Only values up to 0x7F are allowed", clk_rate);
+            assert!(
+                clk_rate > 0x7F,
+                "Clock rate {:?} is to high. Only values up to 0x7F are allowed",
+                clk_rate
+            );
 
             self.0 = clk_rate & 0x7F;
         }
@@ -815,21 +842,120 @@ mod args {
     #[derive(Debug, Copy, Clone)]
     pub struct FastClock {
         clk_rate: u8,
-        frac: u8,
+        frac_minsl: u8,
+        frac_minsh: u8,
         duration: Duration,
-        clk_cntrl: u8
+        clk_cntrl: u8,
     }
 
     impl FastClock {
-        pub fn parse(clk_rate: u8, frac: u8, mins: u8, hours: u8, days: u8, clk_cntrl: u8) -> Self {
+        pub fn parse(clk_rate: u8, frac_minsl: u8, frac_minsh: u8, mins: u8, hours: u8, days: u8, clk_cntrl: u8) -> Self {
             let min = 0xFF - mins % 60;
             let hour = 0xFF - hours % 60;
 
-            let secs : u64 = min as u64 * 60 + hour as u64 * 60 * 60 + days as u64 * 24 * 60 * 60;
+            let secs: u64 = min as u64 * 60 + hour as u64 * 60 * 60 + days as u64 * 24 * 60 * 60;
 
             let duration = Duration::new(secs, 0);
 
-            FastClock{ clk_rate: clk_rate & 0x7F, frac, duration, clk_cntrl }
+            FastClock {
+                clk_rate: clk_rate & 0x7F,
+                frac_minsl,
+                frac_minsh,
+                duration,
+                clk_cntrl,
+            }
+        }
+    }
+
+    #[derive(Debug, Copy, Clone)]
+    pub struct ImArg{
+        reps: u8,
+        dhi: u8,
+        address: u16,
+        function_type: u8,
+        function_bits: u16
+    }
+
+    impl ImArg {
+        pub fn parse(check_byte: u8, reps: u8, dhi: u8, im1: u8, im2 : u8, im3: u8, im4: u8, im5: u8) -> ImArg {
+            assert_eq!(check_byte, 0x7F, "Checkbyte of ImmPacket is not 0x7F");
+
+            if reps == 0x34 {
+                let address = ((im2 as u16) << 8) | im1 as u16;
+
+                let function_type = if im3 == 0x5E { 0x5E } else if im3 == 0x5F { 0x5F } else { 0x20 };
+                let mut function_bits = if function_type == 0x5E || function_type == 0x5F { im4 as u16 } else { im3 as u16 };
+
+                function_bits = function_bits & 0x7F;
+
+                Self {reps, dhi, address, function_type, function_bits}
+            } else {
+                let address = im1 as u16;
+
+                let function_type = if im3 == 0x5E { 0x5E } else if im3 == 0x5F { 0x5F } else { 0x20 };
+                let mut function_bits = if function_type == 0x5E || function_type == 0x5F { im3 as u16 } else { im2 as u16 };
+
+                function_bits = function_bits & 0x7F;
+
+                Self {reps, dhi, address, function_type, function_bits}
+            }
+        }
+    }
+
+    #[derive(Debug, Copy, Clone)]
+    pub struct WrSlDataTime(FastClock, TrkArg, IdArg);
+
+    impl WrSlDataTime {
+        pub fn parse(clk_rate: u8, frac_minsh: u8, frac_minsl: u8, mins: u8, trk: u8, hours: u8, days: u8, clk_cntr: u8, id1: u8, id2: u8) -> Self {
+            WrSlDataTime(FastClock::parse(clk_rate, frac_minsl, frac_minsh, mins, hours, days, clk_cntr),
+                         TrkArg::parse(trk),
+                         IdArg::parse(id1, id2))
+        }
+    }
+
+    #[derive(Debug, Copy, Clone)]
+    pub struct WrSlDataPt(Pcmd, Hopsa, Lopsa, TrkArg, CvArg, DataArg);
+
+    impl WrSlDataPt {
+        pub fn parse(pcmd: u8, arg3: u8, hopsa: u8, lopsa: u8, trk: u8, cvh: u8, cvl: u8, data7: u8, arg10: u8, arg11: u8) -> Self {
+            WrSlDataPt(Pcmd::parse(pcmd), Hopsa::parse(hopsa), Lopsa::parse(lopsa), TrkArg::parse(trk), CvArg::parse(cvh, cvl), DataArg::parse(data7))
+        }
+    }
+
+    #[derive(Debug, Copy, Clone)]
+    pub struct WrSlDataGeneral(SlotArg, Stat1Arg, Stat2Arg, AddressArg, SpeedArg, DirfArg, TrkArg, SndArg, IdArg);
+
+    impl WrSlDataGeneral {
+        pub fn parse(slot: u8, stat1: u8, adr: u8, spd: u8, dirf: u8, trk: u8, stat2: u8, adr2: u8, snd: u8, id1: u8, id2: u8) -> Self {
+            WrSlDataGeneral(SlotArg::parse(slot),
+                            Stat1Arg::parse(stat1),
+                            Stat2Arg::parse(stat2),
+                            AddressArg::parse(adr2, adr),
+                            SpeedArg::parse(spd),
+                            DirfArg::parse(dirf),
+                            TrkArg::parse(trk),
+                            SndArg::parse(snd),
+                            IdArg::parse(id1, id2))
+        }
+    }
+
+    #[derive(Debug, Copy, Clone)]
+    pub struct WrSlDataStructure {
+        slot_type: u8,
+        time_slot: WrSlDataTime,
+        pt_slot: WrSlDataPt,
+        general_slot: WrSlDataGeneral
+    }
+
+    impl WrSlDataStructure {
+        pub fn parse(arg1: u8, arg2: u8, arg3: u8, arg4: u8, arg5: u8, arg6: u8, arg7: u8, arg8: u8, arg9: u8, arg10: u8, arg11: u8) -> Self {
+            let slot_type = if arg1 == 0x7C { 0x7C } else if arg1 == 0x7B { 0x7B } else { 0x00 };
+
+            let time_slot = WrSlDataTime::parse(arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11);
+            let pt_slot = WrSlDataPt::parse(arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11);
+            let general_slot = WrSlDataGeneral::parse(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11);
+
+            WrSlDataStructure{ slot_type, time_slot, pt_slot, general_slot }
         }
     }
 
@@ -861,11 +987,19 @@ pub enum Message {
     LocoSpd(SlotArg, SpeedArg) = 0xA0,
     MultiSense(MTypeArg, ZasArg, SenseAddrArg) = 0xD0,
     UhliFun(SlotArg, FunctionArg) = 0xD4,
-    WrSlData() = 0xEF,
-    SlRdData(SlotArg, Stat1Arg, AddressArg, SpeedArg, DirfArg, TrkArg, Stat2Arg, SndArg, IdArg) = 0xE7,
-    // PeerXfer() = 0xE5,
-    // LissyRep() = 0xE4,
-    // ImmPacket() = 0xED,
+    WrSlData(WrSlDataGeneral) = 0xEF,
+    SlRdData(
+        SlotArg,
+        Stat1Arg,
+        AddressArg,
+        SpeedArg,
+        DirfArg,
+        TrkArg,
+        Stat2Arg,
+        SndArg,
+        IdArg,
+    ) = 0xE7,
+    ImmPacket(ImArg) = 0xED,
 }
 
 impl Message {
@@ -961,7 +1095,7 @@ impl Message {
             )),
             0xB5 => Ok(Self::SlotStat1(
                 SlotArg::parse(args[0]),
-                Stat1Arg::parse(args[1])
+                Stat1Arg::parse(args[1]),
             )),
             0xB4 => Ok(Self::LongAck(
                 LopcArg::parse(args[0]),
@@ -989,41 +1123,49 @@ impl Message {
     fn parse6(opc: u8, args: &[u8]) -> Result<Self, MessageParseError> {
         assert_eq!(args.len(), 4, "length of args mut be 4");
         match opc {
-            0xD0 =>
-                Ok(Self::MultiSense(
-                    MTypeArg::parse(args[0]),
-                    ZasArg::parse(args[1]),
-                    SenseAddrArg::parse(args[2], args[3])
-                )),
-            0xD4 =>
-                {
-                    assert_eq!(0x20, args[0], "Value of arg0 can only be {:?}", 0x20);
-                    Ok(Self::UhliFun(
-                        SlotArg::parse(args[1]),
-                        FunctionArg::parse(args[2], args[3]),
-                    ))
-                },
-            _ => Err(MessageParseError::UnknownOpcode(opc))
+            0xD0 => Ok(Self::MultiSense(
+                MTypeArg::parse(args[0]),
+                ZasArg::parse(args[1]),
+                SenseAddrArg::parse(args[2], args[3]),
+            )),
+            0xD4 => {
+                assert_eq!(0x20, args[0], "Value of arg0 can only be {:?}", 0x20);
+                Ok(Self::UhliFun(
+                    SlotArg::parse(args[1]),
+                    FunctionArg::parse(args[2], args[3]),
+                ))
+            }
+            _ => Err(MessageParseError::UnknownOpcode(opc)),
         }
     }
 
     #[allow(unused_variables)] // TODO: remove allowance when parse_var is implemented
     fn parse_var(opc: u8, args: &[u8]) -> Result<Self, MessageParseError> {
-        assert_eq!(args.len() as u8 + 2, args[0], "length of args mut be {:?}", args[0]);
+        assert_eq!(
+            args.len() as u8 + 2,
+            args[0],
+            "length of args mut be {:?}",
+            args[0]
+        );
         match opc {
-            0xE7 =>
-                Ok(Self::SlRdData(
-                    SlotArg::parse(args[1]),
-                    Stat1Arg::parse(args[2]),
-                    AddressArg::parse(args[3], args[8]),
-                    SpeedArg::parse(args[4]),
-                    DirfArg::parse(args[5]),
-                    TrkArg::parse(args[6]),
-                    Stat2Arg::parse(args[7]),
-                    SndArg::parse(args[9]),
-                    IdArg::parse(args[10], args[11])
-                )),
-            _ => Err(MessageParseError::UnknownOpcode(opc))
+            0xE7 => Ok(Self::SlRdData(
+                SlotArg::parse(args[1]),
+                Stat1Arg::parse(args[2]),
+                AddressArg::parse(args[3], args[8]),
+                SpeedArg::parse(args[4]),
+                DirfArg::parse(args[5]),
+                TrkArg::parse(args[6]),
+                Stat2Arg::parse(args[7]),
+                SndArg::parse(args[9]),
+                IdArg::parse(args[10], args[11]),
+            )),
+            0xED => Ok(Self::ImmPacket(
+                ImArg::parse(args[1], args[2], args[3], args[4], args[5], args[6], args[7], args[8])
+            )),
+            0xEF => Ok(Self::WrSlData(
+                WrSlDataGeneral::parse(args[1], args[2], args[3], args[4], args[5], args[6], args[7], args[8], args[9], args[10], args[11])
+            )),
+            _ => Err(MessageParseError::UnknownOpcode(opc)),
         }
     }
 
