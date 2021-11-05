@@ -664,7 +664,7 @@ mod args {
     impl Hopsa {
 
         pub fn parse(o_mode: u8) -> Self {
-            Hopsa(o_mode & 0x7F)
+            Hopsa(o_mode & 0xEF) // TODO: Must be rechecked by Nomino
         }
 
         pub fn service_mode(&self) -> bool {
@@ -679,7 +679,7 @@ mod args {
     impl Lopsa {
 
         pub fn parse(o_mode: u8) -> Self {
-            Lopsa(o_mode & 0x7F)
+            Lopsa(o_mode & 0xEF) // TODO: Must be rechecked by Nomino
         }
 
         pub fn service_mode(&self) -> bool {
@@ -1009,7 +1009,7 @@ impl Message {
 
     #[allow(unused_variables)] // TODO: remove allowance when parse_var is implemented
     fn parse_var(opc: u8, args: &[u8]) -> Result<Self, MessageParseError> {
-        assert_eq!(args.len() as u8, args[0], "length of args mut be {:?}", args[0]);
+        assert_eq!(args.len() as u8 + 2, args[0], "length of args mut be {:?}", args[0]);
         match opc {
             0xE7 =>
                 Ok(Self::SlRdData(
