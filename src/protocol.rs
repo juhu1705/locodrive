@@ -1141,7 +1141,7 @@ impl Message {
             0xE7 => Ok(Self::SlRdData(
                 SlotArg::parse(args[1]),
                 Stat1Arg::parse(args[2]),
-                AddressArg::parse(args[3], args[8]),
+                AddressArg::parse(args[8], args[3]),
                 SpeedArg::parse(args[4]),
                 DirfArg::parse(args[5]),
                 TrkArg::parse(args[6]),
