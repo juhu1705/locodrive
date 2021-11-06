@@ -964,42 +964,32 @@ mod args {
 #[repr(u8)]
 #[derive(Debug)]
 pub enum Message {
-    Idle = 0x85,
-    GpOn = 0x83,
-    GpOff = 0x82,
-    Busy = 0x81,
+    Idle,
+    GpOn,
+    GpOff,
+    Busy,
 
-    LocoAdr(AddressArg) = 0xBF,
-    SwAck(SwitchArg) = 0xBD,
-    SwState(SwitchArg) = 0xBC,
-    RqSlData(SlotArg) = 0xBB,
-    MoveSlots(SlotArg, SlotArg) = 0xBA,
-    LinkSlots(SlotArg, SlotArg) = 0xB9,
-    UnlinkSlots(SlotArg, SlotArg) = 0xB8,
-    ConsistFunc(SlotArg, DirfArg) = 0xB6,
-    SlotStat1(SlotArg, Stat1Arg) = 0xB5,
-    LongAck(LopcArg, Ack1Arg) = 0xB4,
-    InputRep(InArg) = 0xB2,
-    SwRep(SnArg) = 0xB1,
-    SwReq(SwitchArg) = 0xB0,
-    LocoSnd(SlotArg, SndArg) = 0xA2,
-    LocoDirf(SlotArg, DirfArg) = 0xA1,
-    LocoSpd(SlotArg, SpeedArg) = 0xA0,
-    MultiSense(MTypeArg, ZasArg, SenseAddrArg) = 0xD0,
-    UhliFun(SlotArg, FunctionArg) = 0xD4,
-    WrSlData(WrSlDataGeneral) = 0xEF,
-    SlRdData(
-        SlotArg,
-        Stat1Arg,
-        AddressArg,
-        SpeedArg,
-        DirfArg,
-        TrkArg,
-        Stat2Arg,
-        SndArg,
-        IdArg,
-    ) = 0xE7,
-    ImmPacket(ImArg) = 0xED,
+    LocoAdr(AddressArg),
+    SwAck(SwitchArg),
+    SwState(SwitchArg),
+    RqSlData(SlotArg),
+    MoveSlots(SlotArg, SlotArg),
+    LinkSlots(SlotArg, SlotArg),
+    UnlinkSlots(SlotArg, SlotArg),
+    ConsistFunc(SlotArg, DirfArg),
+    SlotStat1(SlotArg, Stat1Arg),
+    LongAck(LopcArg, Ack1Arg),
+    InputRep(InArg),
+    SwRep(SnArg),
+    SwReq(SwitchArg),
+    LocoSnd(SlotArg, SndArg),
+    LocoDirf(SlotArg, DirfArg),
+    LocoSpd(SlotArg, SpeedArg),
+    MultiSense(MTypeArg, ZasArg, SenseAddrArg),
+    UhliFun(SlotArg, FunctionArg),
+    WrSlData(WrSlDataStructure),
+    SlRdData(SlotArg, Stat1Arg, AddressArg, SpeedArg, DirfArg, TrkArg, Stat2Arg, SndArg, IdArg),
+    ImmPacket(ImArg),
 }
 
 impl Message {
@@ -1163,7 +1153,7 @@ impl Message {
                 ImArg::parse(args[1], args[2], args[3], args[4], args[5], args[6], args[7], args[8])
             )),
             0xEF => Ok(Self::WrSlData(
-                WrSlDataGeneral::parse(args[1], args[2], args[3], args[4], args[5], args[6], args[7], args[8], args[9], args[10], args[11])
+                WrSlDataStructure::parse(args[1], args[2], args[3], args[4], args[5], args[6], args[7], args[8], args[9], args[10], args[11])
             )),
             _ => Err(MessageParseError::UnknownOpcode(opc)),
         }
