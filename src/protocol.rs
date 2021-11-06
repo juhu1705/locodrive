@@ -691,7 +691,7 @@ mod args {
 
     impl Hopsa {
         pub fn parse(o_mode: u8) -> Self {
-            Hopsa(o_mode & 0xEF) // TODO: Must be rechecked by Nomino
+            Hopsa(o_mode & 0x7F)
         }
 
         pub fn service_mode(&self) -> bool {
@@ -704,7 +704,7 @@ mod args {
 
     impl Lopsa {
         pub fn parse(o_mode: u8) -> Self {
-            Lopsa(o_mode & 0xEF) // TODO: Must be rechecked by Nomino
+            Lopsa(o_mode & 0x7F)
         }
 
         pub fn service_mode(&self) -> bool {
