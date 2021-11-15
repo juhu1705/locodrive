@@ -27,6 +27,14 @@ mod args {
             );
             self.0 = address;
         }
+
+        pub fn adr1(&self) -> u8 {
+            (self.0 & 0x007F) as u8
+        }
+
+        pub fn adr2(&self) -> u8 {
+            ((self.0 >> 7) & 0x007F) as u8
+        }
     }
 
     #[derive(Debug, Copy, Clone)]
@@ -85,6 +93,25 @@ mod args {
         pub fn set_state(&mut self, state: bool) {
             self.state = state;
         }
+
+        pub fn sw1(&self) -> u8 {
+            (self.address & 0x007F) as u8
+        }
+
+        pub fn sw2(&self) -> u8 {
+            let mut sw2 = ((self.address >> 7) & 0x000F) as u8;
+
+            sw2 |= match self.direction {
+                SwitchDirection::Curved => 0x20,
+                SwitchDirection::Straight => 0x00
+            };
+
+            if self.state {
+                sw2 |= 0x10;
+            }
+
+            sw2
+        }
     }
 
     #[derive(Debug, Copy, Clone)]
@@ -95,7 +122,7 @@ mod args {
             Self(slot & 0x7F)
         }
 
-        pub fn number(&self) -> u8 {
+        pub fn slot(&self) -> u8 {
             self.0
         }
 
@@ -122,6 +149,14 @@ mod args {
                 0x00 => Self::Stop,
                 0x01 => Self::EmergencyStop,
                 _ => Self::Drive(spd - 1),
+            }
+        }
+
+        pub fn spd(&self) -> u8 {
+            match *self {
+                SpeedArg::Stop => 0x00,
+                SpeedArg::EmergencyStop => 0x01,
+                SpeedArg::Drive(spd) => spd
             }
         }
     }
@@ -159,6 +194,10 @@ mod args {
             } else {
                 self.0 &= !mask;
             }
+        }
+
+        pub fn dirf(&self) -> u8 {
+            self.0
         }
     }
 
@@ -214,6 +253,20 @@ mod args {
         pub fn prog_busy(&self) -> bool {
             self.prog_busy
         }
+
+        pub fn trk_arg(&self) -> u8 {
+            let mut trk_arg = if self.power { 0x01 } else { 0x00 };
+            if self.idle {
+                trk_arg |= 0x02;
+            }
+            if self.mlok1 {
+                trk_arg |= 0x04;
+            }
+            if self.prog_busy {
+                trk_arg |= 0x08;
+            }
+            trk_arg
+        }
     }
 
     #[derive(Debug, Copy, Clone)]
@@ -243,6 +296,10 @@ mod args {
             } else {
                 self.0 &= !mask;
             }
+        }
+
+        pub fn snd(&self) -> u8 {
+            self.0
         }
     }
 
@@ -333,6 +390,35 @@ mod args {
         pub fn decoder_type(&self) -> DecoderType {
             self.decoder_type
         }
+
+        pub fn stat1(&self) -> u8 {
+            let mut stat1: u8 = if self.spurge { 0x80 } else { 0x00 };
+
+            stat1 |= match self.consist {
+                Consist::LogicalMid => 0x48,
+                Consist::LogicalTop => 0x08,
+                Consist::LogicalSubMember => 0x40,
+                Consist::Free => 0x00
+            };
+
+            stat1 |= match self.state {
+                State::InUse => 0x30,
+                State::Idle => 0x20,
+                State::Common => 0x10,
+                State::Free => 0x00
+            };
+
+            stat1 |= match self.decoder_type {
+                DecoderType::Dcc28 => 0x04,
+                DecoderType::Dcc128 => 0x07,
+                DecoderType::Regular28 => 0x00,
+                DecoderType::AdrMobile28 => 0x01,
+                DecoderType::Step14 => 0x02,
+                DecoderType::Speed128 => 0x03
+            };
+
+            stat1
+        }
     }
 
     #[derive(Debug, Copy, Clone)]
@@ -368,6 +454,17 @@ mod args {
         pub fn id_encoded_alias(&self) -> bool {
             self.id_encoded_alias
         }
+
+        pub fn stat2(&self) -> u8 {
+            let mut stat2 = if self.has_adv { 0x01 } else { 0x00 };
+            if self.no_id_usage {
+                stat2 |= 0x04;
+            }
+            if self.id_encoded_alias {
+                stat2 |= 0x08;
+            }
+            stat2
+        }
     }
 
     #[derive(Debug, Copy, Clone)]
@@ -396,7 +493,7 @@ mod args {
             Self(ack1)
         }
 
-        pub fn code(&self) -> u8 {
+        pub fn ack1(&self) -> u8 {
             self.0
         }
 
@@ -456,6 +553,7 @@ mod args {
         pub fn address(&self) -> u16 {
             self.address
         }
+
         pub fn address_ds54(&self) -> u16 {
             self.address << 1
                 | if self.source_type() == SourceType::Switch {
@@ -464,9 +562,11 @@ mod args {
                     0
                 }
         }
+
         pub fn source_type(&self) -> SourceType {
             self.source_type
         }
+
         pub fn state(&self) -> bool {
             self.state
         }
@@ -497,8 +597,25 @@ mod args {
         pub fn set_source_type(&mut self, source_type: SourceType) {
             self.source_type = source_type;
         }
+
         pub fn set_state(&mut self, state: bool) {
             self.state = state;
+        }
+
+        pub fn in1(&self) -> u8 {
+            self.address as u8 & 0x7F
+        }
+
+        pub fn in2(&self) -> u8 {
+            let mut in2 = ((self.address >> 7) as u8) & 0x0F;
+            in2 |= match self.source_type {
+                SourceType::Aux => 0x00,
+                SourceType::Switch => 0x20
+            };
+            if self.state {
+                in2 |= 0x10;
+            }
+            in2
         }
     }
 
@@ -540,6 +657,21 @@ mod args {
                 t,
             }
         }
+
+        pub fn sn1(&self) -> u8 {
+            (self.address as u8) & 0x7F
+        }
+
+        pub fn sn2(&self) -> u8 {
+            let mut sn2 = (self.address >> 7) as u8 & 0x0F;
+            if self.c {
+                sn2 |= 0x40;
+            }
+            if self.t {
+                sn2 |= 0x80;
+            }
+            sn2
+        }
     }
 
     #[derive(Debug, Copy, Clone)]
@@ -548,6 +680,14 @@ mod args {
     impl IdArg {
         pub fn parse(id1: u8, id2: u8) -> Self {
             IdArg(id1 & 0xF7, id2 & 0xF7)
+        }
+
+        pub fn id1(&self) -> u8 {
+            self.0
+        }
+
+        pub fn id2(&self) -> u8 {
+            self.1
         }
     }
 
@@ -558,6 +698,10 @@ mod args {
         pub fn parse(m_type: u8) -> Self {
             MTypeArg(m_type)
         }
+
+        pub fn m_type(&self) -> u8 {
+            self.0
+        }
     }
 
     #[derive(Debug, Copy, Clone)]
@@ -566,6 +710,10 @@ mod args {
     impl ZasArg {
         pub fn parse(zone_and_section: u8) -> Self {
             ZasArg(zone_and_section)
+        }
+
+        pub fn zas(&self) -> u8 {
+            self.0
         }
     }
 
@@ -578,6 +726,14 @@ mod args {
             address |= (addr2 as u16) << 7;
 
             SenseAddrArg(address)
+        }
+
+        pub fn addr1(&self) -> u8 {
+            self.0 as u8 & 0x7F
+        }
+
+        pub fn addr2(&self) -> u8 {
+            (self.0 >> 7) as u8
         }
     }
 
@@ -621,16 +777,41 @@ mod args {
                 self.1 &= !mask;
             }
         }
+
+        pub fn group(&self) -> u8 {
+            self.0
+        }
+
+        pub fn function(&self) -> u8 {
+            self.1
+        }
     }
 
     impl Debug for FunctionArg {
         fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
             write!(
                 f,
-                "DirfArg(f9: {}, f10: {}, f11: {})",
+                "DirfArg(f9: {}, f10: {}, f11: {}, f12: {}, f13: {}, f14: {}, f15: {}, f16: {}, f17: {}, f18: {}, f19: {}, f20: {}, f21: {}, f22: {}, f23: {}, f24: {}, f25: {}, f26: {}, f27: {}, f28: {})",
                 self.f(9),
                 self.f(10),
                 self.f(11),
+                self.f(12),
+                self.f(13),
+                self.f(14),
+                self.f(15),
+                self.f(16),
+                self.f(17),
+                self.f(18),
+                self.f(19),
+                self.f(20),
+                self.f(21),
+                self.f(22),
+                self.f(23),
+                self.f(24),
+                self.f(25),
+                self.f(26),
+                self.f(27),
+                self.f(28),
             )
         }
     }
@@ -660,6 +841,23 @@ mod args {
                 ty2,
             }
         }
+
+        pub fn pcmd(&self) -> u8 {
+            let mut pcmd = if self.write { 0x20 } else { 0x00 };
+            if self.byte_mode {
+                pcmd |= 0x40;
+            }
+            if self.ops_mode {
+                pcmd |= 0x02;
+            }
+            if self.ty1 {
+                pcmd |= 0x80;
+            }
+            if self.ty2 {
+                pcmd |= 0x01;
+            }
+            pcmd
+        }
     }
 
     #[derive(Debug, Copy, Clone)]
@@ -684,6 +882,20 @@ mod args {
                 programming_track_empty,
             }
         }
+
+        pub fn stat(&self) -> u8 {
+            let mut stat = if self.user_aborted { 0x01 } else { 0x00 };
+            if self.no_read_ack {
+                stat |= 0x02;
+            }
+            if self.no_write_ack {
+                stat |= 0x04;
+            }
+            if self.programming_track_empty {
+                stat |= 0x08;
+            }
+            stat
+        }
     }
 
     #[derive(Debug, Copy, Clone)]
@@ -697,6 +909,10 @@ mod args {
         pub fn service_mode(&self) -> bool {
             self.0 == 0
         }
+
+        pub fn o_mode(&self) -> u8 {
+            self.0
+        }
     }
 
     #[derive(Debug, Copy, Clone)]
@@ -709,6 +925,10 @@ mod args {
 
         pub fn service_mode(&self) -> bool {
             self.0 == 0
+        }
+
+        pub fn o_mode(&self) -> u8 {
+            self.0
         }
     }
 
@@ -755,6 +975,21 @@ mod args {
                 self.0 &= !mask;
             }
         }
+
+        pub fn cvh(&self) -> u8 {
+            let mut cvh = (self.0 >> 7) as u8;
+            let high_cv = cvh & 0x06 << 3;
+            cvh &= 0x01;
+            cvh |= high_cv;
+            if self.data7() {
+                cvh |= 0x02;
+            }
+            cvh
+        }
+
+        pub fn cvl(&self) -> u8 {
+            self.0 as u8 & 0x7F
+        }
     }
 
     impl Debug for CvArg {
@@ -798,6 +1033,10 @@ mod args {
                 self.0 &= !mask;
             }
         }
+
+        pub fn data(&self) -> u8 {
+            self.0
+        }
     }
 
     impl Debug for DataArg {
@@ -834,7 +1073,7 @@ mod args {
             self.0 = clk_rate & 0x7F;
         }
 
-        pub fn get_rate(&self) -> u8 {
+        pub fn clk_rate(&self) -> u8 {
             self.0
         }
     }
@@ -850,8 +1089,8 @@ mod args {
 
     impl FastClock {
         pub fn parse(clk_rate: u8, frac_minsl: u8, frac_minsh: u8, mins: u8, hours: u8, days: u8, clk_cntrl: u8) -> Self {
-            let min = 0xFF - mins % 60;
-            let hour = 0xFF - hours % 60;
+            let min = mins % 60 - 0xFF;
+            let hour = hours % 60 - 0xFF;
 
             let secs: u64 = min as u64 * 60 + hour as u64 * 60 * 60 + days as u64 * 24 * 60 * 60;
 
@@ -865,6 +1104,34 @@ mod args {
                 clk_cntrl,
             }
         }
+
+        pub fn clk_rate(&self) -> u8 {
+            self.clk_rate
+        }
+
+        pub fn frac_minsl(&self) -> u8 {
+            self.frac_minsl
+        }
+
+        pub fn frac_minsh(&self) -> u8 {
+            self.frac_minsh
+        }
+
+        pub fn mins(&self) -> u8 {
+            0xFF - (self.duration.as_secs() % 60) as u8
+        }
+
+        pub fn hours(&self) -> u8 {
+            0xFF - (self.duration.as_secs() / 60 % 60) as u8
+        }
+
+        pub fn days(&self) -> u8 {
+            0xFF - (self.duration.as_secs() / 60 / 60 % 24) as u8
+        }
+
+        pub fn clk_cntrl(&self) -> u8 {
+            self.clk_cntrl
+        }
     }
 
     #[derive(Debug, Copy, Clone)]
@@ -873,7 +1140,8 @@ mod args {
         dhi: u8,
         address: u16,
         function_type: u8,
-        function_bits: u16
+        function_bits: u8,
+        im5: u8
     }
 
     impl ImArg {
@@ -884,21 +1152,78 @@ mod args {
                 let address = ((im2 as u16) << 8) | im1 as u16;
 
                 let function_type = if im3 == 0x5E { 0x5E } else if im3 == 0x5F { 0x5F } else { 0x20 };
-                let mut function_bits = if function_type == 0x5E || function_type == 0x5F { im4 as u16 } else { im3 as u16 };
+                let mut function_bits = if function_type == 0x5E || function_type == 0x5F { im4 } else { im3 };
 
                 function_bits = function_bits & 0x7F;
 
-                Self {reps, dhi, address, function_type, function_bits}
+                Self {reps, dhi, address, function_type, function_bits, im5}
             } else {
                 let address = im1 as u16;
 
                 let function_type = if im3 == 0x5E { 0x5E } else if im3 == 0x5F { 0x5F } else { 0x20 };
-                let mut function_bits = if function_type == 0x5E || function_type == 0x5F { im3 as u16 } else { im2 as u16 };
+                let mut function_bits = if function_type == 0x5E || function_type == 0x5F { im3 } else { im2 & 0xDF };
 
                 function_bits = function_bits & 0x7F;
 
-                Self {reps, dhi, address, function_type, function_bits}
+                Self {reps, dhi, address, function_type, function_bits, im5}
             }
+        }
+
+        pub fn check_byte() -> u8 {
+            0x7F
+        }
+
+        pub fn reps(&self) -> u8 {
+            self.reps
+        }
+
+        pub fn dhi(&self) -> u8 {
+            self.dhi
+        }
+
+        pub fn im1(&self) -> u8 {
+            self.address as u8
+        }
+
+        pub fn im2(&self) -> u8 {
+            return if self.reps == 0x34 {
+                (self.address >> 8) as u8
+            } else {
+                if self.function_type == 0x20 {
+                    self.function_bits | 0x20
+                } else {
+                    self.function_type
+                }
+            }
+        }
+
+        pub fn im3(&self) -> u8 {
+            return if self.reps() == 0x34 {
+                if self.function_type == 0x20 {
+                    self.function_bits | 0x20
+                } else {
+                    self.function_type
+                }
+            } else {
+                if self.function_type == 0x20 {
+                    0x00
+                } else {
+                    self.function_bits
+                }
+            }
+        }
+
+        pub fn im4(&self) -> u8 {
+            if self.reps() == 0x34 {
+                if self.function_type != 0x20 {
+                    return self.function_bits;
+                }
+            }
+            0x00
+        }
+
+        pub fn im5(&self) -> u8 {
+            self.im5
         }
     }
 
@@ -956,6 +1281,15 @@ mod args {
             let general_slot = WrSlDataGeneral::parse(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11);
 
             WrSlDataStructure{ slot_type, time_slot, pt_slot, general_slot }
+        }
+
+        pub fn to_message(&self) -> Vec<u8> {
+            if self.slot_type == 0x7C {
+                return vec![0xEF as u8, 0x0E as u8, 0x7C as u8, self.pt_slot.0.pcmd(), 0x00 as u8, self.pt_slot.1.o_mode(), self.pt_slot.2.o_mode(), self.pt_slot.3.trk_arg(), self.pt_slot.4.cvh(), self.pt_slot.4.cvl(), self.pt_slot.5.data(), 0x00 as u8, 0x00 as u8];
+            } else if self.slot_type == 0x7B {
+                return vec![0xEF as u8, 0x0E as u8, 0x7B as u8, self.time_slot.0.clk_rate(), self.time_slot.0.frac_minsl(), self.time_slot.0.frac_minsh(), self.time_slot.0.mins(), self.time_slot.1.trk_arg(), self.time_slot.0.hours(), self.time_slot.0.days(), self.time_slot.0.clk_cntrl(), self.time_slot.2.id1(), self.time_slot.2.id2()];
+            }
+            return vec![0xEF as u8, 0x0E as u8, self.general_slot.0.slot(), self.general_slot.1.stat1(), self.general_slot.3.adr1(), self.general_slot.4.spd(), self.general_slot.5.dirf(), self.general_slot.6.trk_arg(), self.general_slot.2.stat2(), self.general_slot.3.adr2(), self.general_slot.7.snd(), self.general_slot.8.id1(), self.general_slot.8.id2()];
         }
     }
 
@@ -1161,5 +1495,46 @@ impl Message {
 
     fn validate(msg: &[u8]) -> bool {
         return msg.iter().fold(0, |acc, &b| acc ^ b) == 0xFF;
+    }
+
+    pub fn to_message(&self) -> Vec<u8> {
+        let mut message = match *self {
+            Message::Idle => vec![0x85 as u8],
+            Message::GpOn => vec![0x83 as u8],
+            Message::GpOff => vec![0x82 as u8],
+            Message::Busy => vec![0x81 as u8],
+            Message::LocoAdr(adr_arg) => vec![0xBF as u8, adr_arg.adr2(), adr_arg.adr1()],
+            Message::SwAck(switch_arg) => vec![0xBD as u8, switch_arg.sw1(), switch_arg.sw2()],
+            Message::SwState(switch_arg) => vec![0xBC as u8, switch_arg.sw1(), switch_arg.sw2()],
+            Message::RqSlData(slot_arg) => vec![0xBB as u8, slot_arg.slot(), 0x00 as u8],
+            Message::MoveSlots(src, dst) => vec![0xBA as u8, src.slot(), dst.slot()],
+            Message::LinkSlots(sl1, sl2) => vec![0xB9 as u8, sl1.slot(), sl2.slot()],
+            Message::UnlinkSlots(sl1, sl2) => vec![0xB8 as u8, sl1.slot(), sl2.slot()],
+            Message::ConsistFunc(slot, dirf) => vec![0xB6 as u8, slot.slot(), dirf.dirf()],
+            Message::SlotStat1(slot, stat1) => vec![0xB5 as u8, slot.slot(), stat1.stat1()],
+            Message::LongAck(lopc, ack1) => vec![0xB4 as u8, lopc.lopc(), ack1.ack1()],
+            Message::InputRep(input) => vec![0xB2 as u8, input.in1(), input.in2()],
+            Message::SwRep(sn_arg) => vec![0xB1 as u8, sn_arg.sn1(), sn_arg.sn2()],
+            Message::SwReq(sw) => vec![0xB0 as u8, sw.sw1(), sw.sw2()],
+            Message::LocoSnd(slot, snd) => vec![0xA2 as u8, slot.slot(), snd.snd()],
+            Message::LocoDirf(slot, dirf) => vec![0xA1 as u8, slot.slot(), dirf.dirf()],
+            Message::LocoSpd(slot, spd) => vec![0xA0 as u8, slot.slot(), spd.spd()],
+            Message::MultiSense(m_type, zas, sense_adr) => vec![0xD0 as u8, m_type.m_type(), zas.zas(), sense_adr.addr1(), sense_adr.addr2()],
+            Message::UhliFun(slot, function) => vec![0xD4 as u8, 0x20 as u8, slot.slot(), function.group(), function.function()],
+            Message::WrSlData(wr_slot_data_arg) => wr_slot_data_arg.to_message(),
+            Message::SlRdData(slot, stat1, adr, spd,
+                              dirf, trk, stat2, snd, id) =>
+                vec![0xE7 as u8, 0x0E as u8, slot.slot(), stat1.stat1(), adr.adr1(), spd.spd(), dirf.dirf(), trk.trk_arg(),
+                    stat2.stat2(), adr.adr2(), snd.snd(), id.id1(), id.id2()],
+            Message::ImmPacket(im) => vec![0xED as u8, 0x0B as u8, 0x7F as u8, im.reps(), im.dhi(), im.im1(), im.im2(), im.im3(), im.im4(), im.im5()]
+        };
+
+        message.append(&mut vec![Self::check_sum(&message)]);
+
+        return message;
+    }
+
+    fn check_sum(msg: &[u8]) -> u8 {
+        msg.iter().fold(0, |acc, &b| acc ^ b)
     }
 }

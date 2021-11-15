@@ -56,7 +56,13 @@ fn main() {
     loop {
         print!("Read: ");
         match Message::parse(&mut stream) {
-            Ok(msg) => println!("=> {:?}", msg),
+            Ok(msg) => {
+                print!("=> {:?} ==>", msg);
+                for byte in msg.to_message() {
+                    print!(" {:02x} ", byte);
+                }
+                println!()
+            },
             Err(err) => {
                 println!("=> ERROR: {}", err);
                 if let MessageParseError::UnexpectedEnd = err {
