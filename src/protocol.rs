@@ -102,8 +102,8 @@ mod args {
             let mut sw2 = ((self.address >> 7) & 0x000F) as u8;
 
             sw2 |= match self.direction {
-                SwitchDirection::Curved => 0x20,
-                SwitchDirection::Straight => 0x00
+                SwitchDirection::Curved => 0x00,
+                SwitchDirection::Straight => 0x20
             };
 
             if self.state {
@@ -156,7 +156,7 @@ mod args {
             match *self {
                 SpeedArg::Stop => 0x00,
                 SpeedArg::EmergencyStop => 0x01,
-                SpeedArg::Drive(spd) => spd
+                SpeedArg::Drive(spd) => spd + 1
             }
         }
     }
@@ -256,7 +256,7 @@ mod args {
 
         pub fn trk_arg(&self) -> u8 {
             let mut trk_arg = if self.power { 0x01 } else { 0x00 };
-            if self.idle {
+            if !self.idle {
                 trk_arg |= 0x02;
             }
             if self.mlok1 {
@@ -1529,12 +1529,12 @@ impl Message {
             Message::ImmPacket(im) => vec![0xED as u8, 0x0B as u8, 0x7F as u8, im.reps(), im.dhi(), im.im1(), im.im2(), im.im3(), im.im4(), im.im5()]
         };
 
-        message.append(&mut vec![Self::check_sum(&message)]);
+        message.push(Self::check_sum(&message));
 
         return message;
     }
 
     fn check_sum(msg: &[u8]) -> u8 {
-        msg.iter().fold(0, |acc, &b| acc ^ b)
+        0xFF - msg.iter().fold(0, |acc, &b| acc ^ b)
     }
 }
