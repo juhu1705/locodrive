@@ -664,6 +664,9 @@ mod args {
 
         pub fn sn2(&self) -> u8 {
             let mut sn2 = (self.address >> 7) as u8 & 0x0F;
+            if self.format {
+                sn2 |= 0x20;
+            }
             if self.c {
                 sn2 |= 0x40;
             }
@@ -1135,7 +1138,7 @@ mod args {
     }
 
     #[derive(Debug, Copy, Clone)]
-    pub struct ImArg{
+    pub struct ImArg {
         reps: u8,
         dhi: u8,
         address: u16,
