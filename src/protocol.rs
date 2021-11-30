@@ -1296,6 +1296,253 @@ mod args {
         }
     }
 
+    #[derive(Debug, Copy, Clone)]
+    pub struct LissyIrReport {
+        arg1: u8,
+        dir: bool,
+        unit: u16,
+        address: u16,
+        arg6: u8
+    }
+
+    impl LissyIrReport {
+        pub fn parse(arg1: u8, high_unit: u8, low_unit: u8, high_adr: u8, low_adr: u8, arg6: u8) -> Self {
+            assert_eq!(arg1, 0x00, "Given message is not a LissyIR report!");
+
+            let dir = high_unit & 0x40 == 0x40;
+            let unit = (((high_unit & 0x3F) as u16) << 7) | (low_unit as u16);
+            let address = (((high_adr & 0x7F) as u16) << 7) | (low_adr as u16);
+
+            LissyIrReport{arg1, dir, unit, address, arg6}
+        }
+
+        pub fn to_message(&self) -> Vec<u8> {
+            let mut high_unit = ((self.unit >> 7) as u8) & 0x3F;
+            if self.dir {
+                high_unit |= 0x40;
+            }
+            let low_unit = self.unit as u8 & 0x7F;
+            let high_adr = ((self.address >> 7) as u8) & 0x7F;
+            let low_adr = self.address as u8 & 0x7F;
+            vec![0xE4, 0x08, self.arg1, high_unit, low_unit, high_adr, low_adr, self.arg6]
+        }
+    }
+
+    #[derive(Debug, Copy, Clone)]
+    pub struct RFID5Report {
+        arg1: u8,
+        address: u16,
+        rfid0: u8,
+        rfid1: u8,
+        rfid2: u8,
+        rfid3: u8,
+        rfid4: u8,
+        rfid_hi: u8
+    }
+
+    impl RFID5Report {
+        pub fn parse(arg1: u8, high_adr: u8, low_adr: u8, rfid0: u8, rfid1: u8, rfid2: u8, rfid3: u8, rfid4: u8, rfid_hi: u8) -> Self {
+            assert_eq!(arg1, 0x41, "Given message is not a RFID-5 report!");
+            let address = (((high_adr & 0x7F) as u16) << 7) | (low_adr as u16);
+            RFID5Report{ arg1, address, rfid0, rfid1, rfid2, rfid3, rfid4, rfid_hi }
+        }
+
+        pub fn to_message(&self) -> Vec<u8> {
+            let high_adr = ((self.address >> 7) as u8) & 0x7F;
+            let low_adr = (self.address as u8) & 0x7F;
+            vec![0xE4, 0x0C, self.arg1, high_adr, low_adr, self.rfid0, self.rfid1, self.rfid2, self.rfid3, self.rfid4, self.rfid_hi]
+        }
+    }
+
+    #[derive(Debug, Copy, Clone)]
+    pub struct RFID7Report {
+        arg1: u8,
+        address: u16,
+        rfid0: u8,
+        rfid1: u8,
+        rfid2: u8,
+        rfid3: u8,
+        rfid4: u8,
+        rfid5: u8,
+        rfid6: u8,
+        rfid_hi: u8
+    }
+
+    impl RFID7Report {
+        pub fn parse(arg1: u8, high_adr: u8, low_adr: u8, rfid0: u8, rfid1: u8, rfid2: u8, rfid3: u8, rfid4: u8, rfid5: u8, rfid6: u8, rfid_hi: u8) -> Self {
+            assert_eq!(arg1, 0x41, "Given message is not a RFID-7 report!");
+            let address = (((high_adr & 0x7F) as u16) << 7) | (low_adr as u16);
+            RFID7Report{arg1, address, rfid0, rfid1, rfid2, rfid3, rfid4, rfid5, rfid6, rfid_hi}
+        }
+
+        pub fn to_message(&self) -> Vec<u8> {
+            let high_adr = ((self.address >> 7) as u8) & 0x7F;
+            let low_adr = (self.address as u8) & 0x7F;
+            vec![0xE4, 0x0E, self.arg1, high_adr, low_adr, self.rfid0, self.rfid1, self.rfid2, self.rfid3, self.rfid4, self.rfid5, self.rfid6, self.rfid_hi]
+        }
+    }
+
+    #[derive(Debug, Copy, Clone)]
+    pub struct WheelcntReport {
+        arg1: u8,
+        unit: u16,
+        direction: bool,
+        count: u16,
+        arg6: u8
+    }
+
+    impl WheelcntReport {
+        pub fn parse(arg1: u8, high_unit: u8, low_unit: u8, high_count: u8, low_count: u8, arg6: u8) -> Self {
+            assert_eq!(arg1, 0x40, "Given message is not a wheelcnt report!");
+            let count = ((high_count as u16) << 7) | (low_count as u16);
+            let direction = high_unit & 0x40 == 0x40;
+            let unit = (((high_unit & 0x3F) as u16) << 7) | (low_unit as u16);
+            WheelcntReport{arg1, unit, direction, count, arg6}
+        }
+
+        pub fn to_message(&self) -> Vec<u8> {
+            let mut high_unit = ((self.unit >> 7) as u8) & 0x3F;
+            if self.direction {
+                high_unit |= 0x40;
+            }
+            let low_unit = self.unit as u8 & 0x7F;
+            let high_count = ((self.count >> 7) as u8) & 0x7F;
+            let low_count = self.count as u8 & 0x7F;
+            vec![0xE4, 0x08, self.arg1, high_unit, low_unit, high_count, low_count, self.arg6]
+        }
+    }
+
+    #[derive(Debug, Copy, Clone)]
+    pub enum RepStructure {
+        LissyIrReport(LissyIrReport),
+        RFID5Report(RFID5Report),
+        RFID7Report(RFID7Report),
+        WheelcntReport(WheelcntReport)
+    }
+
+    impl RepStructure {
+        pub fn parse(count: u8, args: &[u8]) -> Self {
+            return if args[0] == 0x00 {
+                Self::LissyIrReport(LissyIrReport::parse(args[0], args[1], args[2], args[3], args[4], args[5]))
+            } else if args[0] == 0x40 {
+                Self::WheelcntReport(WheelcntReport::parse(args[0], args[1], args[2], args[3], args[4], args[5]))
+            } else if args[0] == 0x41 && count == 0x0C {
+                Self::RFID5Report(RFID5Report::parse(args[0], args[1], args[2], args[3], args[4], args[5], args[6], args[7], args[8]))
+            } else {
+                Self::RFID7Report(RFID7Report::parse(args[0], args[1], args[2], args[3], args[4], args[5], args[6], args[7], args[8], args[9], args[10]))
+            }
+        }
+    }
+
+    #[derive(Debug, Copy, Clone)]
+    pub struct DstArg(u16);
+
+    impl DstArg {
+        pub fn parse(dst_low: u8, dst_high: u8) -> Self {
+            let dst = ((dst_high as u16) << 7) | (dst_low as u16);
+            DstArg(dst)
+        }
+
+        pub fn dst_low(&self) -> u8 {
+            self.0 as u8 & 0x7F
+        }
+
+        pub fn dst_high(&self) -> u8 {
+            (self.0 >> 7) as u8 & 0x7F
+        }
+    }
+
+    #[derive(Debug, Copy, Clone)]
+    pub struct PxctData {
+        pxc: u8,
+        d1: u8,
+        d2: u8,
+        d3: u8,
+        d4: u8,
+        d5: u8,
+        d6: u8,
+        d7: u8,
+        d8: u8
+    }
+
+    impl PxctData {
+        pub fn parse(pxtc1: u8, d1: u8, d2: u8, d3: u8, d4: u8, pxtc2: u8, d5: u8, d6: u8, d7: u8, d8: u8) -> Self {
+            let pxc = ((pxtc1 & 0x70) >> 4) | ((pxtc2 & 0x70) >> 1);
+
+            PxctData{pxc, d1: d1 | ((pxtc1 & 0x01) << 7), d2: d2 | ((pxtc1 & 0x02) << 6), d3: d3 | ((pxtc1 & 0x04) << 5), d4: d4 | ((pxtc1 & 0x08) << 4), d5: d5 | ((pxtc2 & 0x01) << 7), d6: d6 | ((pxtc2 & 0x02) << 6), d7: d7 | ((pxtc2 & 0x04) << 5), d8: d8 | ((pxtc2 & 0x08) << 4)}
+        }
+
+        pub fn pxct1(&self) -> u8 {
+            let mut pxct1 = self.pxc & 0x07 << 4;
+
+            if self.d1 & 0x40 == 0x40 {
+                pxct1 |= 0x01;
+            }
+            if self.d2 & 0x40 == 0x40 {
+                pxct1 |= 0x02;
+            }
+            if self.d3 & 0x40 == 0x40 {
+                pxct1 |= 0x04;
+            }
+            if self.d4 & 0x40 == 0x40 {
+                pxct1 |= 0x08;
+            }
+
+            pxct1
+        }
+
+        pub fn pxct2(&self) -> u8 {
+            let mut pxct1 = self.pxc & 0x78 << 1;
+
+            if self.d5 & 0x40 == 0x40 {
+                pxct1 |= 0x01;
+            }
+            if self.d6 & 0x40 == 0x40 {
+                pxct1 |= 0x02;
+            }
+            if self.d7 & 0x40 == 0x40 {
+                pxct1 |= 0x04;
+            }
+            if self.d8 & 0x40 == 0x40 {
+                pxct1 |= 0x08;
+            }
+
+            pxct1
+        }
+
+        pub fn d1(&self) -> u8 {
+            self.d1 & 0x3F
+        }
+
+        pub fn d2(&self) -> u8 {
+            self.d2 & 0x3F
+        }
+
+        pub fn d3(&self) -> u8 {
+            self.d3 & 0x3F
+        }
+
+        pub fn d4(&self) -> u8 {
+            self.d4 & 0x3F
+        }
+
+        pub fn d5(&self) -> u8 {
+            self.d5 & 0x3F
+        }
+
+        pub fn d6(&self) -> u8 {
+            self.d6 & 0x3F
+        }
+
+        pub fn d7(&self) -> u8 {
+            self.d7 & 0x3F
+        }
+
+        pub fn d8(&self) -> u8 {
+            self.d8 & 0x3F
+        }
+    }
+
 }
 
 #[repr(u8)]
@@ -1327,6 +1574,8 @@ pub enum Message {
     WrSlData(WrSlDataStructure),
     SlRdData(SlotArg, Stat1Arg, AddressArg, SpeedArg, DirfArg, TrkArg, Stat2Arg, SndArg, IdArg),
     ImmPacket(ImArg),
+    Rep(RepStructure),
+    PeerXfer(SlotArg, DstArg, PxctData)
 }
 
 impl Message {
@@ -1492,6 +1741,8 @@ impl Message {
             0xEF => Ok(Self::WrSlData(
                 WrSlDataStructure::parse(args[1], args[2], args[3], args[4], args[5], args[6], args[7], args[8], args[9], args[10], args[11])
             )),
+            0xE4 => Ok(Self::Rep(RepStructure::parse(args[0], &args[1..]))),
+            0xE5 => Ok(Self::PeerXfer(SlotArg::parse(args[1]), DstArg::parse(args[2], args[3]), PxctData::parse(args[4], args[5], args[6], args[7], args[8], args[9], args[10], args[11], args[12], args[13]))),
             _ => Err(MessageParseError::UnknownOpcode(opc)),
         }
     }
@@ -1529,7 +1780,14 @@ impl Message {
                               dirf, trk, stat2, snd, id) =>
                 vec![0xE7 as u8, 0x0E as u8, slot.slot(), stat1.stat1(), adr.adr1(), spd.spd(), dirf.dirf(), trk.trk_arg(),
                     stat2.stat2(), adr.adr2(), snd.snd(), id.id1(), id.id2()],
-            Message::ImmPacket(im) => vec![0xED as u8, 0x0B as u8, 0x7F as u8, im.reps(), im.dhi(), im.im1(), im.im2(), im.im3(), im.im4(), im.im5()]
+            Message::ImmPacket(im) => vec![0xED as u8, 0x0B as u8, 0x7F as u8, im.reps(), im.dhi(), im.im1(), im.im2(), im.im3(), im.im4(), im.im5()],
+            Message::Rep(rep) => match rep {
+                RepStructure::RFID7Report(report) => report.to_message(),
+                RepStructure::RFID5Report(report) => report.to_message(),
+                RepStructure::LissyIrReport(report) => report.to_message(),
+                RepStructure::WheelcntReport(report) => report.to_message(),
+            },
+            Message::PeerXfer(src, dst, pxct) => vec![0xE5, 0x10, src.slot(), dst.dst_low(), dst.dst_high(), pxct.pxct1(), pxct.d1(), pxct.d2(), pxct.d3(), pxct.d4(), pxct.pxct2(), pxct.d5(), pxct.d6(), pxct.d7(), pxct.d8()]
         };
 
         message.push(Self::check_sum(&message));
