@@ -10,8 +10,11 @@ use locodrive::protocol::Message;
 use serial::prelude::*;
 
 fn main() {
-    if env::args_os().len() != 2 {
-        eprintln!("Error: Invalid argument count");
+
+    let args: Vec<String> = env::args().collect();
+
+    if args.len() < 2 {
+        eprintln!("Usage: {} <serial port>", args[0]);
         process::exit(1);
     }
 
@@ -41,7 +44,7 @@ fn main() {
     }
 
     // set up the stream iterator
-    let mut stream = BufReader::new(port).bytes().map(|r| match r {
+    let mut stream = BufReader::new(&mut port).bytes().map(|r| match r {
         Ok(byte) => {
             // upon yielding a byte, print it
             print!("{:02x} ", byte);
