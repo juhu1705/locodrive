@@ -6,6 +6,7 @@ pub enum MessageParseError {
     UnknownOpcode(u8),
     UnexpectedEnd,
     InvalidChecksum,
+    Update
 }
 
 impl Display for MessageParseError {
@@ -14,6 +15,7 @@ impl Display for MessageParseError {
             Self::UnknownOpcode(opc) => write!(f, "unknown opcode: {:x}", opc),
             Self::UnexpectedEnd => write!(f, "unexpected end of stream"),
             Self::InvalidChecksum => write!(f, "invalid checksum"),
+            Self::Update => write!(f, "update")
         }
     }
 }

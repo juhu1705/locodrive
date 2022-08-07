@@ -48,36 +48,7 @@ impl Message {
     /// [`UnknownOpcode`]: MessageParseError::UnknownOpcode
     /// [`UnexpectedEnd`]: MessageParseError::UnexpectedEnd
     /// [`InvalidChecksum`]: MessageParseError::InvalidChecksum
-    pub fn parse<I: Iterator<Item = u8>>(stream: &mut I) -> Result<Self, MessageParseError> {
-        // create the buffer (a message can be at most 256 bytes long)
-        // and map the iterator to store all read bytes in the buffer
-        let mut buf = [0u8; 256];
-        let mut stream = stream.enumerate().map(|(i, b)| {
-            buf[i] = b;
-            b
-        });
-
-        // get first two bytes from stream
-        let (opc, byte1) = match stream.next().zip(stream.next()) {
-            Some(bytes) => bytes,
-            None => return Err(MessageParseError::UnexpectedEnd),
-        };
-
-        // determine length of the message by comparing the ms 3 bytes
-        let len = match opc & 0xE0 {
-            0x80 => 2,
-            0xA0 => 4,
-            0xC0 => 6,
-            0xE0 => byte1 as usize,
-            _ => return Err(MessageParseError::UnknownOpcode(opc)),
-        };
-
-        // advance iterator by len - 2 to read full message into buf
-        // TODO: replace with `advance_by(len - 2)` when available
-        if len > 2 && stream.nth(len - 3) == None {
-            return Err(MessageParseError::UnexpectedEnd);
-        }
-
+    pub fn parse(buf: &[u8], opc: u8, len: usize) -> Result<Self, MessageParseError> {
         // validate checksum
         if !Self::validate(&buf[0..len]) {
             return Err(MessageParseError::InvalidChecksum);
@@ -252,5 +223,17 @@ impl Message {
 
     fn check_sum(msg: &[u8]) -> u8 {
         0xFF - msg.iter().fold(0, |acc, &b| acc ^ b)
+    }
+
+    pub fn lack_follows(&self) -> bool {
+        match self {
+            Message::LocoAdr(_) => true,
+            Message::SwAck(_) => true,
+            Message::SwState(_) => true,
+            Message::SwReq(_) => true,
+            Message::WrSlData(_) => true,
+            Message::ImmPacket(_) => true,
+            _ => false
+        }
     }
 }
