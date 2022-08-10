@@ -110,6 +110,7 @@ impl Message {
         if !Self::validate(&buf[0..len]) {
             return Err(MessageParseError::InvalidChecksum);
         }
+        println!("Is valid");
 
         // call appropriate parse function
         match len {

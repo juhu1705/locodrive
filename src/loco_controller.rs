@@ -112,6 +112,8 @@ impl LocoNetConnector {
                 Err(_) => return ()
             };
 
+            println!("Start thread!");
+
             #[cfg(unix)]
             port.set_exclusive(false)
                 .expect("Unable to set serial port exclusive to false");
@@ -119,8 +121,10 @@ impl LocoNetConnector {
             let mut lack = false;
             let mut last_message = Message::Busy;
 
+            println!("Configured successfully!");
 
-            while *new_arc_wait_to.lock().unwrap() {
+            while !*new_arc_wait_to.lock().unwrap() {
+                println!("Start reading!");
                 let new_arc_send_locked = Arc::new((&last_message_move, &notify_wait_move, &notify_received_move));
 
                 LocoNetConnector::read(&mut port,
@@ -134,9 +138,12 @@ impl LocoNetConnector {
 
     /// Stops the loco net message reader and wait for the stop
     pub async fn stop_reader(&mut self) {
+        println!("Stop called");
         if self.reading_thread.is_some() {
+            println!("Reader must stop");
             *self.stop.lock().unwrap() = true;
             mem::replace(&mut self.reading_thread, None).take().unwrap().await.unwrap();
+            println!("Hopefully stopped!");
         }
     }
 
@@ -168,13 +175,20 @@ impl LocoNetConnector {
                     *lack = false;
                 }
 
-                send_to.send(LocoNetMessage::MESSAGE(message)).await.unwrap();
+                match send_to.send(LocoNetMessage::MESSAGE(message)).await {
+                    Err(err) => {
+                        println!("{:?}", err)
+                    }
+                    Ok(_) => ()
+                }
             }
         }
     }
 
     pub async fn parse(port: &mut SerialStream, send: &Arc<(&Arc<Mutex<Vec<u8>>>, &Arc<Condvar>, &Arc<Condvar>)>) -> Result<Message, MessageParseError> {
         let mut buf = vec![0u8; 1];
+
+        println!("Try reading!");
 
         let opc = match port.read_exact(&mut buf).await {
             Ok(_) => buf[0],
@@ -209,11 +223,16 @@ impl LocoNetConnector {
         let (lock, cvar, waiter) = **send;
         let mut last_send = lock.lock().unwrap();
 
+        println!("{} {} {:?} {:?}", (*last_send).is_empty(), (*last_send) == buf, *last_send, buf);
+
         if !(*last_send).is_empty() && (*last_send) == buf {
             *last_send = vec![0u8; 0];
+            println!("Notify");
             waiter.notify_all();
             cvar.notify_one();
         }
+
+        println!("Parse message");
 
         Message::parse(buf.as_slice(), opc, len)
     }
@@ -221,10 +240,11 @@ impl LocoNetConnector {
     /// Writes a set of bytes to the loco net by appending the checksum and sending it to the connection
     pub async fn write(&mut self, message: Message) -> bool {
         if self.reading_thread.is_none() {
+            print!("1");
             return false;
         }
 
-        let bytes = Self::append_checksum(message.to_message());
+        let bytes = message.to_message();
 
         let (lock, cvar, waiter) = &*self.send;
 
@@ -236,6 +256,7 @@ impl LocoNetConnector {
                 .unwrap();
 
             if result.1.timed_out() {
+                println!("2");
                 return false;
             }
         }
@@ -250,6 +271,7 @@ impl LocoNetConnector {
                 if !(*lock.lock().unwrap()).is_empty() {
                     let result = waiter.wait_timeout_while(lock.lock().unwrap(), Duration::from_millis(self.sending_timeout), |pending| !(*pending).is_empty()).unwrap();
                     if result.1.timed_out() {
+                        print!("3");
                         return false;
                     }
                 }
@@ -261,6 +283,7 @@ impl LocoNetConnector {
 
     /// Appends the checksum at the end of the message
     pub fn append_checksum(mut bytes: Vec<u8>) -> Vec<u8> {
+        println!("{:?}", bytes);
         bytes.push(Self::check_sum(&bytes));
 
         bytes

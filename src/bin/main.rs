@@ -16,16 +16,28 @@ async fn main() {
 
     let arg = env::args_os().nth(1).unwrap();
 
-    let (tx, _) = tokio::sync::mpsc::channel(8);
+    let (tx, mut rx) = tokio::sync::mpsc::channel(8);
 
-    let mut loco_controller = LocoNetConnector::new(arg.to_str().unwrap(), 115_200, 500, 5000, FlowControl::Software, tx).unwrap();
+    let mut loco_controller = LocoNetConnector::new(arg.to_str().unwrap(), 115_200, 5000, 5000, FlowControl::Software, tx).unwrap();
 
     loco_controller.start_reader().await;
 
-    loco_controller.write(Message::LocoSpd(SlotArg::new(3), SpeedArg::new(120))).await;
+    println!("{}", loco_controller.write(Message::LocoSpd(SlotArg::new(7), SpeedArg::new(70))).await);
 
-    loop {
-        print!("Read: ");
+    let mut i = 0;
+
+    while let Some(message) = rx.recv().await {
+        println!("GOT = {:?} {}", message, i);
+        i += 1;
+        if i >= 10 {
+            loco_controller.stop_reader().await;
+            break;
+        }
+    }
+
+    rx.close();
+
+    /*loop {
         /*match Message::parse(&mut stream) {
             Ok(msg) => {
                 print!("=> {:?} ==>", msg);
@@ -41,5 +53,5 @@ async fn main() {
                 }
             }
         }*/
-    }
+    //}*/
 }
