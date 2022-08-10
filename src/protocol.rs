@@ -2,7 +2,7 @@ use crate::error::MessageParseError;
 use crate::args::*;
 
 #[repr(u8)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub enum Message {
     Idle,
     GpOn,
@@ -35,6 +35,63 @@ pub enum Message {
 }
 
 impl Message {
+    /// Reads and Parses the next message from `stream`.
+    ///
+    /// # Errors
+    ///
+    /// This function returns an error if the message could not be parsed:
+    ///
+    /// * [`UnknownOpcode`] if the message has an unknown opcode
+    /// * [`UnexpectedEnd`] if `stream` unexpectedly yields [`None`]
+    /// * [`InvalidChecksum`] if the checksum is invalid
+    ///
+    /// [`UnknownOpcode`]: MessageParseError::UnknownOpcode
+    /// [`UnexpectedEnd`]: MessageParseError::UnexpectedEnd
+    /// [`InvalidChecksum`]: MessageParseError::InvalidChecksum
+    pub fn parse_iter<I: Iterator<Item = u8>>(stream: &mut I) -> Result<Self, MessageParseError> {
+        // create the buffer (a message can be at most 256 bytes long)
+        // and map the iterator to store all read bytes in the buffer
+        let mut buf = [0u8; 256];
+        let mut stream = stream.enumerate().map(|(i, b)| {
+            buf[i] = b;
+            b
+        });
+
+        // get first two bytes from stream
+        let (opc, byte1) = match stream.next().zip(stream.next()) {
+            Some(bytes) => bytes,
+            None => return Err(MessageParseError::UnexpectedEnd),
+        };
+
+        // determine length of the message by comparing the ms 3 bytes
+        let len = match opc & 0xE0 {
+            0x80 => 2,
+            0xA0 => 4,
+            0xC0 => 6,
+            0xE0 => byte1 as usize,
+            _ => return Err(MessageParseError::UnknownOpcode(opc)),
+        };
+
+        // advance iterator by len - 2 to read full message into buf
+        // TODO: replace with `advance_by(len - 2)` when available
+        if len > 2 && stream.nth(len - 3) == None {
+            return Err(MessageParseError::UnexpectedEnd);
+        }
+
+        // validate checksum
+        if !Self::validate(&buf[0..len]) {
+            return Err(MessageParseError::InvalidChecksum);
+        }
+
+        // call appropriate parse function
+        match len {
+            2 => Self::parse2(opc),
+            4 => Self::parse4(opc, &buf[1..3]),
+            6 => Self::parse6(opc, &buf[1..5]),
+            var => Self::parse_var(opc, &buf[1..var - 1]),
+        }
+    }
+    
     /// Reads and Parses the next message from `stream`.
     ///
     /// # Errors

@@ -1,5 +1,6 @@
 use std::error::Error;
 use std::fmt::{Display, Formatter};
+use std::io;
 
 #[derive(Debug)]
 pub enum MessageParseError {
@@ -21,3 +22,9 @@ impl Display for MessageParseError {
 }
 
 impl Error for MessageParseError {}
+
+impl From<io::Error> for MessageParseError {
+    fn from(_: io::Error) -> Self {
+        todo!()
+    }
+}
