@@ -42,21 +42,11 @@ impl AddressArg {
     pub fn adr2(&self) -> u8 {
         ((self.0 >> 7) & 0x007F) as u8
     }
-
-    pub fn to_string(&self) -> String {
-        format!("adr: {}", self.0)
-    }
 }
 
 impl PartialEq for AddressArg {
     fn eq(&self, other: &Self) -> bool {
         self.0 == other.0
-    }
-}
-
-impl Display for AddressArg {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "adr: {}", self.0)
     }
 }
 
