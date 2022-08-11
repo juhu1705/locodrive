@@ -4,7 +4,7 @@ use std::mem;
 use std::sync::{Arc, Condvar, Mutex};
 use std::time::Duration;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::sync::broadcast::Sender;
+use tokio::sync::mpsc::Sender;
 use tokio::task::JoinHandle;
 use tokio_serial::{
     DataBits, Error, FlowControl, Parity, SerialPort, SerialPortBuilderExt, SerialStream, StopBits,
@@ -28,11 +28,15 @@ pub enum LocoNetMessage {
 type SendSynchronisation = Arc<(Arc<Mutex<Vec<u8>>>, Arc<Condvar>, Arc<Condvar>)>;
 type ReferencedSendSynchronisation<'a> = Arc<(&'a Arc<Mutex<Vec<u8>>>, &'a Arc<Condvar>, &'a Arc<Condvar>)>;
 
+/// # General
+///
 /// This struct handles a connection to the LocoNet.
 ///
 /// All received messages on the port are send to the in [LocoNetConnector::send_to] defined channel.
 /// - Note: The auto returned messages as defined in the LocoNet protocol are not send to the [LocoNetConnector::send_to] channel.
 ///   instead they are handled directly inside this struct.
+///
+/// # Usage
 ///
 /// To send a message see [LocoNetConnector::send_message].
 /// To receive messages start the reader by calling [LocoNetConnector::start_reader].
@@ -46,36 +50,54 @@ type ReferencedSendSynchronisation<'a> = Arc<(&'a Arc<Mutex<Vec<u8>>>, &'a Arc<C
 /// # use locodrive::loco_controller::LocoNetConnector;
 /// # use locodrive::protocol::Message;
 ///
-/// // Creating a sender and receiver for the LocoNetConnector.
-/// let (sender, mut receiver) = tokio::sync::broadcast::channel(1);
+/// #[tokio::main]
+/// async fn main() {
+///     // Creating a sender and receiver for the LocoNetConnector.
+///     let (sender, mut receiver) = tokio::sync::mpsc::channel(1);
 ///
-/// // Creating a LocoNetConnector, reading from the port '/dev/ttyUSB0'.
-/// let mut loco_controller = LocoNetConnector::new(
-///     "/dev/ttyUSB0",
-///     115_200,
-///     5000,
-///     5000,
-///     FlowControl::Software,
-///     sender,
-/// ).unwrap();
+///     // Creating a LocoNetConnector, reading from the port '/dev/ttyUSB0'.
+///     let mut loco_controller = match LocoNetConnector::new(
+///         "/dev/ttyUSB0",
+///         115_200,
+///         5000,
+///         5000,
+///         FlowControl::Software,
+///         sender,
+///     ) {
+///         Ok(loco_controller) => loco_controller,
+///         Err(err) => {
+///             eprintln!("Error: Could not connect to loco net!");
+///             return;
+///         }
+///     };
 ///
-/// loco_controller.stop_reader().await;
+///     // We need to start the reading thread to receive incoming messages
+///     loco_controller.start_reader().await;
 ///
-/// let mut read_messages = 0;
-/// while let Some(message) = receiver.recv().await {
-///     println!("GOT = {:?}", message);
-///     read_messages += 1;
-///     if read_messages >= 10 {
-///        break;
+///     let mut read_messages = 0;
+///     while let Some(message) = receiver.recv().await {
+///         println!("GOT = {:?}", message);
+///         read_messages += 1;
+///         if read_messages >= 10 {
+///            break;
+///         }
 ///     }
 /// }
 /// ```
 pub struct LocoNetConnector {
+    /// The port used to connect to the loco net
     port: SerialStream,
+    /// Here are all values bundled for the intern check of the message sending and receiving.
+    /// The Mutex is used to save the last message send to check against.
+    /// The two Condvar args are used synchronize the writer
     send: SendSynchronisation,
+    /// This is used to call the reader to stop reading
     stop: Arc<Mutex<bool>>,
+    /// This is the thread to await for joining if one reading thread should be closed
     reading_thread: Option<JoinHandle<()>>,
+    /// How long to wait on success of sending
     sending_timeout: u64,
+    /// Where to send incoming messages to.
     send_to: Sender<LocoNetMessage>,
 }
 
@@ -129,9 +151,18 @@ impl LocoNetConnector {
         let wait_to = &self.stop;
         let port = &self.port;
 
-        let port_name = port.name().unwrap();
-        let baud_rate = port.baud_rate().unwrap();
-        let flow_control = port.flow_control().unwrap();
+        let port_name = match port.name() {
+            Some(name) => name,
+            None => return false,
+        };
+        let baud_rate = match port.baud_rate() {
+            Ok(name) => name,
+            Err(_) => return false,
+        };
+        let flow_control = match port.flow_control() {
+            Ok(name) => name,
+            Err(_) => return false,
+        };
         let timeout = port.timeout();
 
         let send = &self.send;

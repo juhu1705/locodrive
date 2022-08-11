@@ -16,7 +16,7 @@ async fn main() {
 
     let arg = env::args_os().nth(1).unwrap();
 
-    let (tx, mut rx) = tokio::sync::broadcast::channel(8);
+    let (tx, mut rx) = tokio::sync::mpsc::channel(8);
 
     let mut loco_controller = LocoNetConnector::new(
         arg.to_str().unwrap(),
@@ -47,8 +47,6 @@ async fn main() {
             break;
         }
     }
-
-    rx.close();
 
     /*loop {
         /*match Message::parse(&mut stream) {
