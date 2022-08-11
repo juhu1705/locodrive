@@ -1,6 +1,6 @@
+use locodrive::args::{SlotArg, SpeedArg};
 use std::{env, process};
 use tokio_serial::FlowControl;
-use locodrive::args::{SlotArg, SpeedArg};
 
 use locodrive::loco_controller::LocoNetConnector;
 use locodrive::protocol::Message;
@@ -16,13 +16,26 @@ async fn main() {
 
     let arg = env::args_os().nth(1).unwrap();
 
-    let (tx, mut rx) = tokio::sync::mpsc::channel(8);
+    let (tx, mut rx) = tokio::sync::broadcast::channel(8);
 
-    let mut loco_controller = LocoNetConnector::new(arg.to_str().unwrap(), 115_200, 5000, 5000, FlowControl::Software, tx).unwrap();
+    let mut loco_controller = LocoNetConnector::new(
+        arg.to_str().unwrap(),
+        115_200,
+        5000,
+        5000,
+        FlowControl::Software,
+        tx,
+    )
+    .unwrap();
 
     loco_controller.start_reader().await;
 
-    println!("{}", loco_controller.write(Message::LocoSpd(SlotArg::new(7), SpeedArg::new(70))).await);
+    println!(
+        "{}",
+        loco_controller
+            .send_message(Message::LocoSpd(SlotArg::new(7), SpeedArg::new(70)))
+            .await
+    );
 
     let mut i = 0;
 

@@ -1,5 +1,5 @@
-use crate::error::MessageParseError;
 use crate::args::*;
+use crate::error::MessageParseError;
 
 #[repr(u8)]
 #[derive(Debug, Copy, Clone)]
@@ -28,10 +28,20 @@ pub enum Message {
     MultiSense(MultiSenseArg, AddressArg),
     UhliFun(SlotArg, FunctionArg),
     WrSlData(WrSlDataStructure),
-    SlRdData(SlotArg, Stat1Arg, AddressArg, SpeedArg, DirfArg, TrkArg, Stat2Arg, SndArg, IdArg),
+    SlRdData(
+        SlotArg,
+        Stat1Arg,
+        AddressArg,
+        SpeedArg,
+        DirfArg,
+        TrkArg,
+        Stat2Arg,
+        SndArg,
+        IdArg,
+    ),
     ImmPacket(ImArg),
     Rep(RepStructure),
-    PeerXfer(SlotArg, DstArg, PxctData)
+    PeerXfer(SlotArg, DstArg, PxctData),
 }
 
 impl Message {
@@ -91,7 +101,7 @@ impl Message {
             var => Self::parse_var(opc, &buf[1..var - 1]),
         }
     }
-    
+
     /// Reads and Parses the next message from `stream`.
     ///
     /// # Errors
@@ -219,14 +229,22 @@ impl Message {
                 SndArg::parse(args[9]),
                 IdArg::parse(args[10], args[11]),
             )),
-            0xED => Ok(Self::ImmPacket(
-                ImArg::parse(args[1], args[2], args[3], args[4], args[5], args[6], args[7], args[8])
-            )),
-            0xEF => Ok(Self::WrSlData(
-                WrSlDataStructure::parse(args[1], args[2], args[3], args[4], args[5], args[6], args[7], args[8], args[9], args[10], args[11])
-            )),
+            0xED => Ok(Self::ImmPacket(ImArg::parse(
+                args[1], args[2], args[3], args[4], args[5], args[6], args[7], args[8],
+            ))),
+            0xEF => Ok(Self::WrSlData(WrSlDataStructure::parse(
+                args[1], args[2], args[3], args[4], args[5], args[6], args[7], args[8], args[9],
+                args[10], args[11],
+            ))),
             0xE4 => Ok(Self::Rep(RepStructure::parse(args[0], &args[1..]))),
-            0xE5 => Ok(Self::PeerXfer(SlotArg::parse(args[1]), DstArg::parse(args[2], args[3]), PxctData::parse(args[4], args[5], args[6], args[7], args[8], args[9], args[10], args[11], args[12], args[13]))),
+            0xE5 => Ok(Self::PeerXfer(
+                SlotArg::parse(args[1]),
+                DstArg::parse(args[2], args[3]),
+                PxctData::parse(
+                    args[4], args[5], args[6], args[7], args[8], args[9], args[10], args[11],
+                    args[12], args[13],
+                ),
+            )),
             _ => Err(MessageParseError::UnknownOpcode(opc)),
         }
     }
@@ -237,46 +255,96 @@ impl Message {
 
     pub fn to_message(&self) -> Vec<u8> {
         let mut message = match *self {
-            Message::Idle => vec![0x85 as u8],
-            Message::GpOn => vec![0x83 as u8],
-            Message::GpOff => vec![0x82 as u8],
-            Message::Busy => vec![0x81 as u8],
-            Message::LocoAdr(adr_arg) => vec![0xBF as u8, adr_arg.adr2(), adr_arg.adr1()],
-            Message::SwAck(switch_arg) => vec![0xBD as u8, switch_arg.sw1(), switch_arg.sw2()],
-            Message::SwState(switch_arg) => vec![0xBC as u8, switch_arg.sw1(), switch_arg.sw2()],
-            Message::RqSlData(slot_arg) => vec![0xBB as u8, slot_arg.slot(), 0x00 as u8],
-            Message::MoveSlots(src, dst) => vec![0xBA as u8, src.slot(), dst.slot()],
-            Message::LinkSlots(sl1, sl2) => vec![0xB9 as u8, sl1.slot(), sl2.slot()],
-            Message::UnlinkSlots(sl1, sl2) => vec![0xB8 as u8, sl1.slot(), sl2.slot()],
-            Message::ConsistFunc(slot, dirf) => vec![0xB6 as u8, slot.slot(), dirf.dirf()],
-            Message::SlotStat1(slot, stat1) => vec![0xB5 as u8, slot.slot(), stat1.stat1()],
-            Message::LongAck(lopc, ack1) => vec![0xB4 as u8, lopc.lopc(), ack1.ack1()],
-            Message::InputRep(input) => vec![0xB2 as u8, input.in1(), input.in2()],
-            Message::SwRep(sn_arg) => vec![0xB1 as u8, sn_arg.sn1(), sn_arg.sn2()],
-            Message::SwReq(sw) => vec![0xB0 as u8, sw.sw1(), sw.sw2()],
-            Message::LocoSnd(slot, snd) => vec![0xA2 as u8, slot.slot(), snd.snd()],
-            Message::LocoDirf(slot, dirf) => vec![0xA1 as u8, slot.slot(), dirf.dirf()],
-            Message::LocoSpd(slot, spd) => vec![0xA0 as u8, slot.slot(), spd.spd()],
-            Message::MultiSense(multi_sense, address) => vec![0xD0 as u8, multi_sense.m_type(), multi_sense.zas(), address.adr1(), address.adr2()],
-            Message::UhliFun(slot, function) => vec![0xD4 as u8, 0x20 as u8, slot.slot(), function.group(), function.function()],
+            Message::Idle => vec![0x85_u8],
+            Message::GpOn => vec![0x83_u8],
+            Message::GpOff => vec![0x82_u8],
+            Message::Busy => vec![0x81_u8],
+            Message::LocoAdr(adr_arg) => vec![0xBF_u8, adr_arg.adr2(), adr_arg.adr1()],
+            Message::SwAck(switch_arg) => vec![0xBD_u8, switch_arg.sw1(), switch_arg.sw2()],
+            Message::SwState(switch_arg) => vec![0xBC_u8, switch_arg.sw1(), switch_arg.sw2()],
+            Message::RqSlData(slot_arg) => vec![0xBB_u8, slot_arg.slot(), 0x00_u8],
+            Message::MoveSlots(src, dst) => vec![0xBA_u8, src.slot(), dst.slot()],
+            Message::LinkSlots(sl1, sl2) => vec![0xB9_u8, sl1.slot(), sl2.slot()],
+            Message::UnlinkSlots(sl1, sl2) => vec![0xB8_u8, sl1.slot(), sl2.slot()],
+            Message::ConsistFunc(slot, dirf) => vec![0xB6_u8, slot.slot(), dirf.dirf()],
+            Message::SlotStat1(slot, stat1) => vec![0xB5_u8, slot.slot(), stat1.stat1()],
+            Message::LongAck(lopc, ack1) => vec![0xB4_u8, lopc.lopc(), ack1.ack1()],
+            Message::InputRep(input) => vec![0xB2_u8, input.in1(), input.in2()],
+            Message::SwRep(sn_arg) => vec![0xB1_u8, sn_arg.sn1(), sn_arg.sn2()],
+            Message::SwReq(sw) => vec![0xB0_u8, sw.sw1(), sw.sw2()],
+            Message::LocoSnd(slot, snd) => vec![0xA2_u8, slot.slot(), snd.snd()],
+            Message::LocoDirf(slot, dirf) => vec![0xA1_u8, slot.slot(), dirf.dirf()],
+            Message::LocoSpd(slot, spd) => vec![0xA0_u8, slot.slot(), spd.spd()],
+            Message::MultiSense(multi_sense, address) => vec![
+                0xD0_u8,
+                multi_sense.m_type(),
+                multi_sense.zas(),
+                address.adr1(),
+                address.adr2(),
+            ],
+            Message::UhliFun(slot, function) => vec![
+                0xD4_u8,
+                0x20_u8,
+                slot.slot(),
+                function.group(),
+                function.function(),
+            ],
             Message::WrSlData(wr_slot_data_arg) => wr_slot_data_arg.to_message(),
-            Message::SlRdData(slot, stat1, adr, spd,
-                              dirf, trk, stat2, snd, id) =>
-                vec![0xE7 as u8, 0x0E as u8, slot.slot(), stat1.stat1(), adr.adr1(), spd.spd(), dirf.dirf(), trk.trk_arg(),
-                    stat2.stat2(), adr.adr2(), snd.snd(), id.id1(), id.id2()],
-            Message::ImmPacket(im) => vec![0xED as u8, 0x0B as u8, 0x7F as u8, im.reps(), im.dhi(), im.im1(), im.im2(), im.im3(), im.im4(), im.im5()],
+            Message::SlRdData(slot, stat1, adr, spd, dirf, trk, stat2, snd, id) => vec![
+                0xE7_u8,
+                0x0E_u8,
+                slot.slot(),
+                stat1.stat1(),
+                adr.adr1(),
+                spd.spd(),
+                dirf.dirf(),
+                trk.trk_arg(),
+                stat2.stat2(),
+                adr.adr2(),
+                snd.snd(),
+                id.id1(),
+                id.id2(),
+            ],
+            Message::ImmPacket(im) => vec![
+                0xED_u8,
+                0x0B_u8,
+                0x7F_u8,
+                im.reps(),
+                im.dhi(),
+                im.im1(),
+                im.im2(),
+                im.im3(),
+                im.im4(),
+                im.im5(),
+            ],
             Message::Rep(rep) => match rep {
                 RepStructure::RFID7Report(report) => report.to_message(),
                 RepStructure::RFID5Report(report) => report.to_message(),
                 RepStructure::LissyIrReport(report) => report.to_message(),
                 RepStructure::WheelcntReport(report) => report.to_message(),
             },
-            Message::PeerXfer(src, dst, pxct) => vec![0xE5, 0x10, src.slot(), dst.dst_low(), dst.dst_high(), pxct.pxct1(), pxct.d1(), pxct.d2(), pxct.d3(), pxct.d4(), pxct.pxct2(), pxct.d5(), pxct.d6(), pxct.d7(), pxct.d8()]
+            Message::PeerXfer(src, dst, pxct) => vec![
+                0xE5,
+                0x10,
+                src.slot(),
+                dst.dst_low(),
+                dst.dst_high(),
+                pxct.pxct1(),
+                pxct.d1(),
+                pxct.d2(),
+                pxct.d3(),
+                pxct.d4(),
+                pxct.pxct2(),
+                pxct.d5(),
+                pxct.d6(),
+                pxct.d7(),
+                pxct.d8(),
+            ],
         };
 
         message.push(Self::check_sum(&message));
 
-        return message;
+        message
     }
 
     fn check_sum(msg: &[u8]) -> u8 {
@@ -284,14 +352,14 @@ impl Message {
     }
 
     pub fn lack_follows(&self) -> bool {
-        match self {
-            Message::LocoAdr(_) => true,
-            Message::SwAck(_) => true,
-            Message::SwState(_) => true,
-            Message::SwReq(_) => true,
-            Message::WrSlData(_) => true,
-            Message::ImmPacket(_) => true,
-            _ => false
-        }
+        matches!(
+            self,
+            Message::LocoAdr(_) |
+            Message::SwAck(_) |
+            Message::SwState(_) |
+            Message::SwReq(_) |
+            Message::WrSlData(_) |
+            Message::ImmPacket(_)
+        )
     }
 }
