@@ -32,8 +32,8 @@ type ReferencedSendSynchronisation<'a> = Arc<(&'a Arc<Mutex<Vec<u8>>>, &'a Arc<C
 ///
 /// This struct handles a connection to the LocoNet.
 ///
-/// All received messages on the port are send to the in [LocoNetConnector::send_to] defined channel.
-/// - Note: The auto returned messages as defined in the LocoNet protocol are not send to the [LocoNetConnector::send_to] channel.
+/// All received messages on the port are send to the defined channel.
+/// - Note: The auto returned messages as defined in the LocoNet protocol are not send to the channel.
 ///   instead they are handled directly inside this struct.
 ///
 /// # Usage
