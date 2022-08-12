@@ -51,66 +51,9 @@ impl Message {
     ///
     /// This function returns an error if the message could not be parsed:
     ///
-    /// * [`UnknownOpcode`] if the message has an unknown opcode
-    /// * [`UnexpectedEnd`] if `stream` unexpectedly yields [`None`]
-    /// * [`InvalidChecksum`] if the checksum is invalid
-    ///
-    /// [`UnknownOpcode`]: MessageParseError::UnknownOpcode
-    /// [`UnexpectedEnd`]: MessageParseError::UnexpectedEnd
-    /// [`InvalidChecksum`]: MessageParseError::InvalidChecksum
-    pub fn parse_iter<I: Iterator<Item = u8>>(stream: &mut I) -> Result<Self, MessageParseError> {
-        // create the buffer (a message can be at most 256 bytes long)
-        // and map the iterator to store all read bytes in the buffer
-        let mut buf = [0u8; 256];
-        let mut stream = stream.enumerate().map(|(i, b)| {
-            buf[i] = b;
-            b
-        });
-
-        // get first two bytes from stream
-        let (opc, byte1) = match stream.next().zip(stream.next()) {
-            Some(bytes) => bytes,
-            None => return Err(MessageParseError::UnexpectedEnd),
-        };
-
-        // determine length of the message by comparing the ms 3 bytes
-        let len = match opc & 0xE0 {
-            0x80 => 2,
-            0xA0 => 4,
-            0xC0 => 6,
-            0xE0 => byte1 as usize,
-            _ => return Err(MessageParseError::UnknownOpcode(opc)),
-        };
-
-        // advance iterator by len - 2 to read full message into buf
-        // TODO: replace with `advance_by(len - 2)` when available
-        if len > 2 && stream.nth(len - 3) == None {
-            return Err(MessageParseError::UnexpectedEnd);
-        }
-
-        // validate checksum
-        if !Self::validate(&buf[0..len]) {
-            return Err(MessageParseError::InvalidChecksum);
-        }
-
-        // call appropriate parse function
-        match len {
-            2 => Self::parse2(opc),
-            4 => Self::parse4(opc, &buf[1..3]),
-            6 => Self::parse6(opc, &buf[1..5]),
-            var => Self::parse_var(opc, &buf[1..var - 1]),
-        }
-    }
-
-    /// Reads and Parses the next message from `stream`.
-    ///
-    /// # Errors
-    ///
-    /// This function returns an error if the message could not be parsed:
-    ///
-    /// * [`UnknownOpcode`] if the message has an unknown opcode
-    /// * [`UnexpectedEnd`] if `stream` unexpectedly yields [`None`]
-    /// * [`InvalidChecksum`] if the checksum is invalid
+    /// - [`UnknownOpcode`] if the message has an unknown opcode
+    /// - [`UnexpectedEnd`] if `stream` unexpectedly yields [`None`]
+    /// - [`InvalidChecksum`] if the checksum is invalid
     ///
     /// [`UnknownOpcode`]: MessageParseError::UnknownOpcode
     /// [`UnexpectedEnd`]: MessageParseError::UnexpectedEnd
@@ -120,7 +63,6 @@ impl Message {
         if !Self::validate(&buf[0..len]) {
             return Err(MessageParseError::InvalidChecksum);
         }
-        println!("Is valid");
 
         // call appropriate parse function
         match len {
@@ -142,7 +84,9 @@ impl Message {
     }
 
     fn parse4(opc: u8, args: &[u8]) -> Result<Self, MessageParseError> {
-        assert_eq!(args.len(), 2, "length of args mut be 2");
+        if args.len() != 2 {
+            return Err(MessageParseError::UnexpectedEnd)
+        }
         match opc {
             0xBF => Ok(Self::LocoAdr(AddressArg::parse(args[0], args[1]))),
             0xBD => Ok(Self::SwAck(SwitchArg::parse(args[0], args[1]))),
@@ -192,14 +136,20 @@ impl Message {
     }
 
     fn parse6(opc: u8, args: &[u8]) -> Result<Self, MessageParseError> {
-        assert_eq!(args.len(), 4, "length of args mut be 4");
+        if args.len() != 4 {
+            return Err(MessageParseError::UnexpectedEnd)
+        }
         match opc {
             0xD0 => Ok(Self::MultiSense(
                 MultiSenseArg::parse(args[0], args[1]),
                 AddressArg::parse(args[2], args[3]),
             )),
             0xD4 => {
-                assert_eq!(0x20, args[0], "Value of arg0 can only be {:?}", 0x20);
+                if 0x20 != args[0] {
+                    return Err(MessageParseError::InvalidFormat(format!(
+                        "Expected first arg of UhliFun to be 0x20 got {:02x}", args[0]
+                    ).into()));
+                }
                 Ok(Self::UhliFun(
                     SlotArg::parse(args[1]),
                     FunctionArg::parse(args[2], args[3]),
@@ -209,14 +159,10 @@ impl Message {
         }
     }
 
-    #[allow(unused_variables)] // TODO: remove allowance when parse_var is implemented
     fn parse_var(opc: u8, args: &[u8]) -> Result<Self, MessageParseError> {
-        assert_eq!(
-            args.len() as u8 + 2,
-            args[0],
-            "length of args mut be {:?}",
-            args[0]
-        );
+        if args.len() + 2 != args[0] as usize {
+            return Err(MessageParseError::UnexpectedEnd)
+        }
         match opc {
             0xE7 => Ok(Self::SlRdData(
                 SlotArg::parse(args[1]),
@@ -229,14 +175,30 @@ impl Message {
                 SndArg::parse(args[9]),
                 IdArg::parse(args[10], args[11]),
             )),
-            0xED => Ok(Self::ImmPacket(ImArg::parse(
-                args[1], args[2], args[3], args[4], args[5], args[6], args[7], args[8],
-            ))),
+            0xED => {
+                if args[1] != 0x7F {
+                    return Err(
+                        MessageParseError::InvalidFormat(
+                            format!("The check byte of the received message was invalid. \
+                            Expected 0x7F got {:02x}", args[1]).into()
+                        )
+                    )
+                }
+
+                Ok(Self::ImmPacket(ImArg::parse(
+                    args[1], args[2], args[3], args[4], args[5], args[6], args[7], args[8],
+                )))
+            },
             0xEF => Ok(Self::WrSlData(WrSlDataStructure::parse(
                 args[1], args[2], args[3], args[4], args[5], args[6], args[7], args[8], args[9],
                 args[10], args[11],
             ))),
-            0xE4 => Ok(Self::Rep(RepStructure::parse(args[0], &args[1..]))),
+            0xE4 => Ok(Self::Rep(
+                match RepStructure::parse(args[0], &args[1..]) {
+                    Err(err) => return Err(err),
+                    Ok(rep) => rep
+                }
+            )),
             0xE5 => Ok(Self::PeerXfer(
                 SlotArg::parse(args[1]),
                 DstArg::parse(args[2], args[3]),
@@ -253,7 +215,7 @@ impl Message {
         return msg.iter().fold(0, |acc, &b| acc ^ b) == 0xFF;
     }
 
-    pub fn to_message(&self) -> Vec<u8> {
+    pub(crate) fn to_message(&self) -> Vec<u8> {
         let mut message = match *self {
             Message::Idle => vec![0x85_u8],
             Message::GpOn => vec![0x83_u8],

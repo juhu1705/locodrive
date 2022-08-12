@@ -2,6 +2,7 @@
 
 use std::fmt::{Debug, Display, Formatter};
 use std::time::Duration;
+use crate::error::MessageParseError;
 
 #[derive(Debug, Copy, Clone, Eq)]
 pub struct AddressArg(u16);
@@ -27,7 +28,7 @@ impl AddressArg {
     }
 
     pub fn set_address(&mut self, address: u16) {
-        assert_eq!(
+        debug_assert_eq!(
             address & 0x3FFF,
             0,
             "address must only use the 14 least significant bits"
@@ -72,7 +73,7 @@ impl SwitchArg {
         }
     }
 
-    pub fn parse(sw1: u8, sw2: u8) -> Self {
+    pub(crate) fn parse(sw1: u8, sw2: u8) -> Self {
         let mut address = sw1 as u16;
         address |= (sw2 as u16 & 0x0F) << 7;
 
@@ -101,7 +102,7 @@ impl SwitchArg {
     }
 
     pub fn set_address(&mut self, address: u16) {
-        assert_eq!(
+        debug_assert_eq!(
             address & 0x07FF,
             0,
             "address must only use the 11 least significant bits"
@@ -160,7 +161,7 @@ impl SlotArg {
     }
 
     pub fn set_slot(&mut self, slot: u8) {
-        assert_eq!(
+        debug_assert_eq!(
             slot & 0x7F,
             0,
             "number must only use the 7 least significant bits"
@@ -760,7 +761,7 @@ impl InArg {
     }
 
     pub fn set_address(&mut self, address: u16) {
-        assert_eq!(
+        debug_assert_eq!(
             address & 0x07FF,
             0,
             "address must only use the 11 least significant bits"
@@ -769,7 +770,7 @@ impl InArg {
     }
 
     pub fn set_address_ds54(&mut self, address_ds54: u16) {
-        assert_eq!(
+        debug_assert_eq!(
             self.address & 0x0FFF,
             0,
             "address must only use the 12 least significant bits"
@@ -1568,7 +1569,7 @@ impl ImArg {
     }
 
     pub fn parse(
-        check_byte: u8,
+        _: u8,
         reps: u8,
         dhi: u8,
         im1: u8,
@@ -1577,8 +1578,6 @@ impl ImArg {
         im4: u8,
         im5: u8,
     ) -> ImArg {
-        assert_eq!(check_byte, 0x7F, "Check byte of ImmPacket is not 0x7F");
-
         if reps == 0x44 || (reps == 0x34 && im4 == 0x00) {
             let address = ((im2 as u16) << 8) | im1 as u16;
 
@@ -2068,7 +2067,7 @@ impl LissyIrReport {
         }
     }
 
-    pub fn parse(
+    fn parse(
         arg1: u8,
         high_unit: u8,
         low_unit: u8,
@@ -2076,7 +2075,6 @@ impl LissyIrReport {
         low_adr: u8,
         arg6: u8,
     ) -> Self {
-        assert_eq!(arg1, 0x00, "Given message is not a LissyIR report!");
 
         let dir = high_unit & 0x40 == 0x40;
         let unit = (((high_unit & 0x3F) as u16) << 7) | (low_unit as u16);
@@ -2159,7 +2157,7 @@ impl RFID5Report {
         }
     }
 
-    pub fn parse(
+    fn parse(
         arg1: u8,
         high_adr: u8,
         low_adr: u8,
@@ -2170,7 +2168,6 @@ impl RFID5Report {
         rfid4: u8,
         rfid_hi: u8,
     ) -> Self {
-        assert_eq!(arg1, 0x41, "Given message is not a RFID-5 report!");
         let address = (((high_adr & 0x7F) as u16) << 7) | (low_adr as u16);
         RFID5Report {
             arg1,
@@ -2275,7 +2272,7 @@ impl RFID7Report {
         }
     }
 
-    pub fn parse(
+    fn parse(
         arg1: u8,
         high_adr: u8,
         low_adr: u8,
@@ -2288,7 +2285,6 @@ impl RFID7Report {
         rfid6: u8,
         rfid_hi: u8,
     ) -> Self {
-        assert_eq!(arg1, 0x41, "Given message is not a RFID-7 report!");
         let address = (((high_adr & 0x7F) as u16) << 7) | (low_adr as u16);
         RFID7Report {
             arg1,
@@ -2385,7 +2381,7 @@ impl WheelcntReport {
         }
     }
 
-    pub fn parse(
+    fn parse(
         arg1: u8,
         high_unit: u8,
         low_unit: u8,
@@ -2393,7 +2389,6 @@ impl WheelcntReport {
         low_count: u8,
         arg6: u8,
     ) -> Self {
-        assert_eq!(arg1, 0x40, "Given message is not a wheelcnt report!");
         let count = ((high_count as u16) << 7) | (low_count as u16);
         let direction = high_unit & 0x40 == 0x40;
         let unit = (((high_unit & 0x3F) as u16) << 7) | (low_unit as u16);
@@ -2465,24 +2460,26 @@ impl RepStructure {
         RepStructure::WheelcntReport(rep)
     }
 
-    pub fn parse(count: u8, args: &[u8]) -> Self {
+    pub fn parse(count: u8, args: &[u8]) -> Result<Self, MessageParseError> {
         if args[0] == 0x00 {
-            Self::LissyIrReport(LissyIrReport::parse(
+            Ok(Self::LissyIrReport(LissyIrReport::parse(
                 args[0], args[1], args[2], args[3], args[4], args[5],
-            ))
+            )))
         } else if args[0] == 0x40 {
-            Self::WheelcntReport(WheelcntReport::parse(
+            Ok(Self::WheelcntReport(WheelcntReport::parse(
                 args[0], args[1], args[2], args[3], args[4], args[5],
-            ))
+            )))
         } else if args[0] == 0x41 && count == 0x0C {
-            Self::RFID5Report(RFID5Report::parse(
+            Ok(Self::RFID5Report(RFID5Report::parse(
                 args[0], args[1], args[2], args[3], args[4], args[5], args[6], args[7], args[8],
-            ))
-        } else {
-            Self::RFID7Report(RFID7Report::parse(
+            )))
+        } else if args[0] == 0x41 && count == 0x0E {
+            Ok(Self::RFID7Report(RFID7Report::parse(
                 args[0], args[1], args[2], args[3], args[4], args[5], args[6], args[7], args[8],
                 args[9], args[10],
-            ))
+            )))
+        } else {
+            Err(MessageParseError::InvalidFormat("The report message was in invalid format!".into()))
         }
     }
 }

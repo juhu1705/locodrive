@@ -25,17 +25,13 @@ async fn main() {
         5000,
         FlowControl::Software,
         tx,
-    )
-    .unwrap();
+    ).await.unwrap();
 
-    loco_controller.start_reader().await;
 
-    println!(
-        "{}",
-        loco_controller
-            .send_message(Message::LocoSpd(SlotArg::new(7), SpeedArg::new(70)))
-            .await
-    );
+    loco_controller
+        .send_message(Message::LocoSpd(SlotArg::new(7), SpeedArg::new(70)))
+        .await.expect("Cannot write to the LocoNet");
+
 
     let mut i = 0;
 
@@ -43,26 +39,7 @@ async fn main() {
         println!("GOT = {:?} {}", message, i);
         i += 1;
         if i >= 10 {
-            loco_controller.stop_reader().await;
             break;
         }
     }
-
-    /*loop {
-        /*match Message::parse(&mut stream) {
-            Ok(msg) => {
-                print!("=> {:?} ==>", msg);
-                for byte in msg.to_message() {
-                    print!(" {:02x} ", byte);
-                }
-                println!()
-            },
-            Err(err) => {
-                println!("=> ERROR: {}", err);
-                if let MessageParseError::UnexpectedEnd = err {
-                    process::exit(2);
-                }
-            }
-        }*/
-    //}*/
 }

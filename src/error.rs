@@ -6,6 +6,7 @@ use std::io;
 pub enum MessageParseError {
     UnknownOpcode(u8),
     UnexpectedEnd,
+    InvalidFormat(String),
     InvalidChecksum,
     Update,
 }
@@ -17,6 +18,7 @@ impl Display for MessageParseError {
             Self::UnexpectedEnd => write!(f, "unexpected end of stream"),
             Self::InvalidChecksum => write!(f, "invalid checksum"),
             Self::Update => write!(f, "update"),
+            Self::InvalidFormat(ref message) => write!(f, "invalid format: {:?}", message)
         }
     }
 }
@@ -24,7 +26,7 @@ impl Display for MessageParseError {
 impl Error for MessageParseError {}
 
 impl From<io::Error> for MessageParseError {
-    fn from(_: io::Error) -> Self {
-        todo!()
+    fn from(err: io::Error) -> Self {
+        MessageParseError::InvalidFormat(err.to_string().into())
     }
 }
