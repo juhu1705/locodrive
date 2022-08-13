@@ -1,33 +1,165 @@
 use crate::args::*;
 use crate::error::MessageParseError;
 
+/// Represents the types of messages that are specified by the `LocoNet` protocol.
 #[repr(u8)]
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum Message {
+    /// Forces the `LocoNet` to switch in Idle state. An emergency stop for all trains is broadcast.
+    /// Note: The `LocoNet` may not response any more.
     Idle,
+    /// Turns the global power on. Activates the railway.
     GpOn,
+    /// Turns the global power off. Deactivates the railway.
     GpOff,
+    /// This is the master `Busy` code. Receiving this indicates that
+    /// the master needs time to fulfill a send request.
     Busy,
 
+    /// Requests a loco address to be put to a free slot by the master.
+    ///
+    /// Using this slot the train is controllable.
+    ///
+    /// # Success
+    ///
+    /// [`Message::SlRdData`] containing all slot and address information.
+    ///
+    /// # Fail
+    ///
+    /// [`Message::LongAck`] with [`Ack1Arg::failed()`]
+    /// Meaning no free slots are available.
     LocoAdr(AddressArg),
+    /// Request state of switch with acknowledgment function
+    ///
+    /// # Success
+    ///
+    /// [`Message::LongAck`] with [`Ack1Arg::success()`]
+    ///
+    /// # Fail
+    ///
+    /// [`Message::LongAck`] with [`Ack1Arg::failed()`]
+    /// Meaning switch state not known / Switch not known.
     SwAck(SwitchArg),
+    /// Request state of switch
+    ///
+    /// # Success
+    ///
+    /// [`Message::LongAck`] with [`Ack1Arg::success()`]
+    ///
+    /// # Fail
+    ///
+    /// [`Message::LongAck`] with [`Ack1Arg::failed()`]
+    /// Meaning switch state not known / Switch not known.
     SwState(SwitchArg),
+    /// Request slot data or status block
+    ///
+    /// # Success
+    ///
+    /// [`Message::SlRdData`] containing all slot information.
     RqSlData(SlotArg),
+    /// Moves all slot information from a `source` to a `destination` slot address.
+    ///
+    /// # Special operations
+    ///
+    /// ## `NULL`-Move
+    ///
+    /// A `NULL`-Move (Move with equal source and destination) can be used to mark the slot as [`State::InUse`].
+    ///
+    /// ## Dispatch put
+    ///
+    /// Moving a slot **to** the *slot 0* marks it as `DISPATCH`-Slot.
+    /// In this case the destination slot is not copied to,
+    /// but marked by the system as DISPATCH slot.
+    ///
+    /// ## Dispatch get
+    ///
+    /// Moving a slot **from** *slot 0* with no destination given (not needed) will
+    /// response with a [`Message::SlRdData`] if a as dispatch marked slot is saved in *slot 0*.
+    /// Otherwise a [`Message::LongAck`] with [`Ack1Arg::failed()`] indicates the
+    /// failure of the operation.
+    ///
+    /// # Success
+    ///
+    /// [`Message::SlRdData`] containing all slot information.
+    ///
+    /// # Failure
+    ///
+    /// [`Message::LongAck`] with [`Ack1Arg::failed()`]
+    /// Meaning slot data could not be moved.
     MoveSlots(SlotArg, SlotArg),
+    /// Links the first given slot to the second one
+    ///
+    /// # Success
+    ///
+    /// [`Message::SlRdData`] containing slot information.
+    ///
+    /// # Failure
+    ///
+    /// [`Message::LongAck`] with [`Ack1Arg::failed()`]
+    /// Meaning slot data could not be linked.
     LinkSlots(SlotArg, SlotArg),
+    /// Unlinks the first given slot from the second one
+    ///
+    /// # Success
+    ///
+    /// [`Message::SlRdData`] containing slot information.
+    ///
+    /// # Failure
+    ///
+    /// [`Message::LongAck`] with [`Ack1Arg::failed()`]
+    /// Meaning slot data could not be linked.
     UnlinkSlots(SlotArg, SlotArg),
+    /// Sets function bits in a [`Consist::LogicalMid`] or
+    /// [`Consist::LogicalSubMember`] linked slot.
     ConsistFunc(SlotArg, DirfArg),
+    /// Writes a slots stat1.
+    /// See [`Stat1Arg`] for information on what you can configure here.
     SlotStat1(SlotArg, Stat1Arg),
+    /// This is a long acknowledgment message mostly used to indicate that some requested
+    /// operation has failed or succeed.
     LongAck(LopcArg, Ack1Arg),
+    /// This holds general sensor input from an addressed sensor.
+    ///
+    /// On state change this message is automatically send from the sensor over the `LocoNet`,
+    /// but if you want to receive all your sensor states you can configure a switch address that
+    /// forces the sensor module to send its state in the `LocoNet` sensor device.
     InputRep(InArg),
+    /// Switch sensor report
+    ///
+    /// Reports the switches type and meta information
     SwRep(SnArg),
+    /// Requests a switch function. More precisely requests a switch to switch to a
+    /// specific direction and activation.
+    ///
+    /// # Failure
+    ///
+    /// [`Message::LongAck`] with [`Ack1Arg::failed()`]
+    /// Meaning the requested action could not be performed.
     SwReq(SwitchArg),
+    /// Sets a slots sound function bits. (functions 5 to 8)
     LocoSnd(SlotArg, SndArg),
+    /// Sets a slots direction and first four function bits.
     LocoDirf(SlotArg, DirfArg),
+    /// Sets a slot speed.
     LocoSpd(SlotArg, SpeedArg),
+
+    /// Used for power management and transponding
     MultiSense(MultiSenseArg, AddressArg),
+    /// In systems from `Uhlenbrock` this message could be used to
+    /// access the slot functions 9 to 28.
     UhliFun(SlotArg, FunctionArg),
+
+    /// Used to write special and more complex slot data.
+    ///
+    /// # Success
+    ///
+    /// [`Message::LongAck`] with [`Ack1Arg::success()`]
+    ///
+    /// # Failure
+    ///
+    /// [`Message::LongAck`] with [`Ack1Arg::failed()`]
     WrSlData(WrSlDataStructure),
+    /// This is a slot data response holding all information on the slot.
     SlRdData(
         SlotArg,
         Stat1Arg,
@@ -39,26 +171,58 @@ pub enum Message {
         SndArg,
         IdArg,
     ),
-    ImmPacket(ImArg),
-    Rep(RepStructure),
+    /// Indicates that the programming service mode is aborted.
+    ProgrammingAborted(ProgrammingAbortedArg),
+
+    /// Moves 8 bytes peer to peer from the source slot to the destination
     PeerXfer(SlotArg, DstArg, PxctData),
+
+    /// This message holds reports
+    /// (I am not really sure what this reports represent
+    /// and what they are used for.
+    /// If you understand them better,
+    /// you may help me to improve this documentation and
+    /// the implementation of reading and writing this messages.)
+    Rep(RepStructure),
+
+    /// Sends n-byte packet immediate
+    ///
+    /// # Response
+    ///
+    /// - [`Message::LongAck`] with [`Ack1Arg::success()`]: Not limited
+    /// - [`Message::LongAck`] with [`Ack1Arg::limited_success()`]:
+    ///   limited with [`Ack1Arg::ack1()`] as limit
+    /// - [`Message::LongAck`] with [`Ack1Arg::failed()`]: Busy
+    ImmPacket(ImArg),
 }
 
 impl Message {
-    /// Reads and Parses the next message from `stream`.
+    /// Parses a `LocoNet` message from `buf`.
     ///
     /// # Errors
     ///
     /// This function returns an error if the message could not be parsed:
     ///
-    /// - [`UnknownOpcode`] if the message has an unknown opcode
-    /// - [`UnexpectedEnd`] if `stream` unexpectedly yields [`None`]
-    /// - [`InvalidChecksum`] if the checksum is invalid
+    /// - [`UnknownOpcode`]: If the message has an unknown opcode
+    /// - [`UnexpectedEnd`]: If the buf not holds the complete message
+    /// - [`InvalidChecksum`]: If the checksum is invalid
+    /// - [`InvalidFormat`]: If the message is in invalid format
     ///
     /// [`UnknownOpcode`]: MessageParseError::UnknownOpcode
     /// [`UnexpectedEnd`]: MessageParseError::UnexpectedEnd
     /// [`InvalidChecksum`]: MessageParseError::InvalidChecksum
-    pub fn parse(buf: &[u8], opc: u8, len: usize) -> Result<Self, MessageParseError> {
+    /// [`InvalidFormat`]: MessageParseError::InvalidFormat
+    pub fn parse(buf: &[u8]) -> Result<Self, MessageParseError> {
+        let opc = buf[0];
+        // We calculate the length of the remaining message to read
+        let len = match opc & 0xE0 {
+            0x80 => 2,
+            0xA0 => 4,
+            0xC0 => 6,
+            0xE0 => buf[1] as usize,
+            _ => return Err(MessageParseError::UnknownOpcode(opc)),
+        };
+
         // validate checksum
         if !Self::validate(&buf[0..len]) {
             return Err(MessageParseError::InvalidChecksum);
@@ -73,6 +237,14 @@ impl Message {
         }
     }
 
+    /// Parse all messages of two bytes length. As the second byte is every time the checksum,
+    /// only the `opc` is needed for parsing.
+    ///
+    /// # Errors
+    ///
+    /// - [`UnknownOpcode`]: If the message has an unknown opcode
+    ///
+    /// [`UnknownOpcode`]: MessageParseError::UnknownOpcode
     fn parse2(opc: u8) -> Result<Self, MessageParseError> {
         match opc {
             0x85 => Ok(Self::Idle),
@@ -83,6 +255,17 @@ impl Message {
         }
     }
 
+    /// Parse all messages of four bytes length.
+    /// Therefore the first byte specifying the message type is passed as `opc` and the
+    /// other two message bytes are passed as `args`.
+    ///
+    /// # Errors
+    ///
+    /// - [`UnknownOpcode`]: If the message has an unknown opcode
+    /// - [`UnexpectedEnd`]: If the buf not holds the complete message
+    ///
+    /// [`UnknownOpcode`]: MessageParseError::UnknownOpcode
+    /// [`UnexpectedEnd`]: MessageParseError::UnexpectedEnd
     fn parse4(opc: u8, args: &[u8]) -> Result<Self, MessageParseError> {
         if args.len() != 2 {
             return Err(MessageParseError::UnexpectedEnd)
@@ -135,6 +318,19 @@ impl Message {
         }
     }
 
+    /// Parse all messages of six bytes length.
+    /// Therefore the first byte specifying the message type is passed as `opc` and the
+    /// other four message bytes are passed as `args`.
+    ///
+    /// # Errors
+    ///
+    /// - [`UnknownOpcode`]: If the message has an unknown opcode
+    /// - [`UnexpectedEnd`]: If the buf not holds the complete message
+    /// - [`InvalidFormat`]: If the message is in invalid format
+    ///
+    /// [`UnknownOpcode`]: MessageParseError::UnknownOpcode
+    /// [`UnexpectedEnd`]: MessageParseError::UnexpectedEnd
+    /// [`InvalidFormat`]: MessageParseError::InvalidFormat
     fn parse6(opc: u8, args: &[u8]) -> Result<Self, MessageParseError> {
         if args.len() != 4 {
             return Err(MessageParseError::UnexpectedEnd)
@@ -148,7 +344,7 @@ impl Message {
                 if 0x20 != args[0] {
                     return Err(MessageParseError::InvalidFormat(format!(
                         "Expected first arg of UhliFun to be 0x20 got {:02x}", args[0]
-                    ).into()));
+                    )));
                 }
                 Ok(Self::UhliFun(
                     SlotArg::parse(args[1]),
@@ -159,28 +355,30 @@ impl Message {
         }
     }
 
+    /// Parse all messages of variable length.
+    /// Therefore the first byte specifying the message type is passed as `opc` and the
+    /// other message bytes are passed as `args`.
+    ///
+    /// # Errors
+    ///
+    /// - [`UnknownOpcode`]: If the message has an unknown opcode
+    /// - [`UnexpectedEnd`]: If the buf not holds the complete message
+    /// - [`InvalidFormat`]: If the message is in invalid format
+    ///
+    /// [`UnknownOpcode`]: MessageParseError::UnknownOpcode
+    /// [`UnexpectedEnd`]: MessageParseError::UnexpectedEnd
+    /// [`InvalidFormat`]: MessageParseError::InvalidFormat
     fn parse_var(opc: u8, args: &[u8]) -> Result<Self, MessageParseError> {
         if args.len() + 2 != args[0] as usize {
             return Err(MessageParseError::UnexpectedEnd)
         }
         match opc {
-            0xE7 => Ok(Self::SlRdData(
-                SlotArg::parse(args[1]),
-                Stat1Arg::parse(args[2]),
-                AddressArg::parse(args[8], args[3]),
-                SpeedArg::parse(args[4]),
-                DirfArg::parse(args[5]),
-                TrkArg::parse(args[6]),
-                Stat2Arg::parse(args[7]),
-                SndArg::parse(args[9]),
-                IdArg::parse(args[10], args[11]),
-            )),
             0xED => {
                 if args[1] != 0x7F {
                     return Err(
                         MessageParseError::InvalidFormat(
                             format!("The check byte of the received message was invalid. \
-                            Expected 0x7F got {:02x}", args[1]).into()
+                            Expected 0x7F got {:02x}", args[1])
                         )
                     )
                 }
@@ -193,6 +391,18 @@ impl Message {
                 args[1], args[2], args[3], args[4], args[5], args[6], args[7], args[8], args[9],
                 args[10], args[11],
             ))),
+            0xE7 => Ok(Self::SlRdData(
+                SlotArg::parse(args[1]),
+                Stat1Arg::parse(args[2]),
+                AddressArg::parse(args[8], args[3]),
+                SpeedArg::parse(args[4]),
+                DirfArg::parse(args[5]),
+                TrkArg::parse(args[6]),
+                Stat2Arg::parse(args[7]),
+                SndArg::parse(args[9]),
+                IdArg::parse(args[10], args[11]),
+            )),
+            0xE6 => Ok(Message::ProgrammingAborted(ProgrammingAbortedArg::parse(args[0], &args[1..args.len()]))),
             0xE4 => Ok(Self::Rep(
                 match RepStructure::parse(args[0], &args[1..]) {
                     Err(err) => return Err(err),
@@ -211,12 +421,15 @@ impl Message {
         }
     }
 
+    /// Validates the `msg` by xor-ing all bytes and checking for the result to be 0xFF.
     fn validate(msg: &[u8]) -> bool {
         return msg.iter().fold(0, |acc, &b| acc ^ b) == 0xFF;
     }
 
-    pub(crate) fn to_message(&self) -> Vec<u8> {
-        let mut message = match *self {
+    /// Parses the given [`Message`] to a [`Vec<u8>`] in the by the `LocoNet` protocol specified format.
+    pub fn to_message(self) -> Vec<u8> {
+        // Parses the message
+        let mut message = match self {
             Message::Idle => vec![0x85_u8],
             Message::GpOn => vec![0x83_u8],
             Message::GpOff => vec![0x82_u8],
@@ -267,6 +480,7 @@ impl Message {
                 id.id1(),
                 id.id2(),
             ],
+            Message::ProgrammingAborted(args) => args.to_message(),
             Message::ImmPacket(im) => vec![
                 0xED_u8,
                 0x0B_u8,
@@ -304,24 +518,66 @@ impl Message {
             ],
         };
 
+        // Appending checksum to the created message
         message.push(Self::check_sum(&message));
 
         message
     }
 
+    /// Calculates the check sum for the given `msg`.
     fn check_sum(msg: &[u8]) -> u8 {
         0xFF - msg.iter().fold(0, |acc, &b| acc ^ b)
     }
 
-    pub fn lack_follows(&self) -> bool {
+    /// Returns the op code for the specified message
+    pub fn opc(&self) -> u8 {
+        match *self {
+            Message::Idle => 0x85,
+            Message::GpOn => 0x83,
+            Message::GpOff => 0x82,
+            Message::Busy => 0x81,
+            Message::LocoAdr(..) => 0xBF,
+            Message::SwAck(..) => 0xBD,
+            Message::SwState(..) => 0xBC,
+            Message::RqSlData(..) => 0xBB,
+            Message::MoveSlots(..) => 0xBA,
+            Message::LinkSlots(..) => 0xB9,
+            Message::UnlinkSlots(..) => 0xB8,
+            Message::ConsistFunc(..) => 0xB6,
+            Message::SlotStat1(..) => 0xB5,
+            Message::LongAck(..) => 0xB4,
+            Message::InputRep(..) => 0xB2,
+            Message::SwRep(..) => 0xB1,
+            Message::SwReq(..) => 0xB0,
+            Message::LocoSnd(..) => 0xA2,
+            Message::LocoDirf(..) => 0xA1,
+            Message::LocoSpd(..) => 0xA0,
+            Message::MultiSense(..) => 0xD0,
+            Message::UhliFun(..) => 0xD4,
+            Message::WrSlData(..) => 0xEF,
+            Message::SlRdData(..) => 0xE7,
+            Message::ProgrammingAborted(..) => 0xE6,
+            Message::PeerXfer(..) => 0xE5,
+            Message::Rep(..) => 0xE4,
+            Message::ImmPacket(..) => 0xED,
+        }
+    }
+
+    /// Checks whether this message expects a long acknowledgment message to follow.
+    pub fn answer_follows(&self) -> bool {
+        0x01 & self.opc() == 0x01
+    }
+
+    /// Indicates if a request with the specified slot
+    /// data was awaited after that message.
+    pub fn await_slot_data(&self) -> bool {
         matches!(
             self,
-            Message::LocoAdr(_) |
-            Message::SwAck(_) |
-            Message::SwState(_) |
-            Message::SwReq(_) |
-            Message::WrSlData(_) |
-            Message::ImmPacket(_)
+            Message::LocoAdr(..) |
+            Message::RqSlData(..) |
+            Message::MoveSlots(..) |
+            Message::LinkSlots(..) |
+            Message::UnlinkSlots(..)
         )
     }
 }

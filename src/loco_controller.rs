@@ -1,4 +1,5 @@
-use crate::error::MessageParseError;
+use std::fmt::Debug;
+use crate::error::{LocoNetSendingError, MessageParseError};
 use crate::protocol::Message;
 use std::sync::{Arc, Condvar, Mutex};
 use std::time::Duration;
@@ -9,7 +10,7 @@ use tokio::sync::Notify;
 use tokio_serial::{DataBits, Error, FlowControl, Parity, SerialPort, SerialPortBuilderExt, SerialStream, StopBits};
 
 /// This message is sent when data are received from the LocoNet.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum LocoNetMessage {
     /// A normal LocoNet message. Consider that all [`LocoNetMessage::Lack`] messages are also send this way.
     Message(Message),
@@ -17,32 +18,17 @@ pub enum LocoNetMessage {
     /// The response message is represent by the first argument and
     /// the before received message is represented the second argument.
     /// Consider that the here mentioned received message is also send as normal [`LocoNetMessage::Message`] afterwards.
-    Lack(Message, Message),
+    Answer(Message, Message),
     /// This message is send when the by the LocoNet received message is not readable.
     /// Please look at [`MessageParseError`] for more information on the errors.
     Error(MessageParseError),
-    /// This message is send when some error appears on opening the serial port
+    /// This message is send when some error appears on opening the serial port.
     SerialPortError(Error),
-}
-
-/// This error type is used to describe errors appearing on [`LocoNetConnector::send_message()`]
-#[derive(Debug)]
-pub enum LocoNetSendingError {
-    /// If the reader is closed. This should not happen normally.
-    /// If it happens your [`LocoNetConnector`] is corrupted and can no longer be used.
-    IllegalState,
-    /// The `LocoNet` does not respond in the specified time.
-    Timeout,
-    /// The `LocoNet` connection returns writing with an error.
-    /// Please recheck your connection.
-    NotWritable
 }
 
 type SendSynchronisation = Arc<(Arc<Mutex<Vec<u8>>>, Arc<Condvar>, Arc<Condvar>)>;
 type ReferencedSendSynchronisation<'a> = Arc<(&'a Arc<Mutex<Vec<u8>>>, &'a Arc<Condvar>, &'a Arc<Condvar>)>;
 
-/// # General
-///
 /// This struct handles a connection to the `LocoNet`.
 ///
 /// All received messages on the port are send to the defined channel.
@@ -61,7 +47,7 @@ type ReferencedSendSynchronisation<'a> = Arc<(&'a Arc<Mutex<Vec<u8>>>, &'a Arc<C
 /// Reading ten messages received from the `LocoNet`:
 /// ```
 /// # use tokio_serial::FlowControl;
-/// # use locodrive::loco_controller::LocoNetConnector;
+/// # use locodrive::loco_controller::LocoNetController;
 /// # use locodrive::protocol::Message;
 /// # use locodrive::args::{SlotArg, SpeedArg};
 /// # use locodrive::protocol::Message::LocoSpd;
@@ -72,22 +58,21 @@ type ReferencedSendSynchronisation<'a> = Arc<(&'a Arc<Mutex<Vec<u8>>>, &'a Arc<C
 ///     let (sender, mut receiver) = tokio::sync::mpsc::channel(1);
 ///
 ///     // Creating a LocoNetConnector, reading from the port '/dev/ttyUSB0'.
-///     let mut loco_connector = match LocoNetConnector::new(
+///     let mut loco_controller = match LocoNetController::new(
 ///         "/dev/ttyUSB0",
 ///         115_200,
-///         5000,
 ///         5000,
 ///         FlowControl::Software,
 ///         sender,
 ///     ).await {
-///         Ok(loco_connector) => loco_connector,
+///         Ok(loco_controller) => loco_controller,
 ///         Err(err) => {
 ///             eprintln!("Error: Could not connect to loco net!");
 ///             return;
 ///         }
 ///     };
 ///
-///     loco_connector.send_message(LocoSpd(SlotArg::new(3), SpeedArg::Stop));
+///     loco_controller.send_message(LocoSpd(SlotArg::new(3), SpeedArg::Stop));
 ///
 ///     let mut read_messages = 0;
 ///     while let Some(message) = receiver.recv().await {
@@ -99,47 +84,53 @@ type ReferencedSendSynchronisation<'a> = Arc<(&'a Arc<Mutex<Vec<u8>>>, &'a Arc<C
 ///     }
 /// }
 /// ```
-pub struct LocoNetConnector {
-    /// The port used to connect to the loco net
+pub struct LocoNetController {
+    /// The port used to connect to the loco net.
     port: SerialStream,
     /// Here are all values bundled for the intern check of the message sending and receiving.
     /// The Mutex is used to save the last message send to check against.
-    /// The two Condvar args are used synchronize the writer
+    /// The two Condvar args are used synchronize the writer.
     send: SendSynchronisation,
-    /// This is used to call the reader to stop reading
+    /// This is used to call the reader to stop reading.
     stop: Arc<Mutex<bool>>,
-    /// Fire stop
+    /// Fire stop to notify the reader to recheck if it should stop
     fire_stop: Arc<Notify>,
-    /// This is the thread to await for joining if one reading thread should be closed
+    /// This is the thread to await for joining if one reading thread should be closed.
     reading_thread: Option<JoinHandle<()>>,
-    /// How long to wait on success of sending
+    /// How long to wait on success of sending.
     sending_timeout: u64,
-    /// Where to send incoming messages to.
-    send_to: Sender<LocoNetMessage>,
 }
 
-impl LocoNetConnector {
-    /// Creates a new port and starts reading on that port
+impl LocoNetController {
+    /// Creates a new serial port connection to a `LocoNet` and starts reading on that port
     ///
     /// # Parameter
+    ///
     /// - `port_name`: Is the name of the port to connect to.
-    ///   If you are not sure, which ports are allowed use [`tokio_serial::available_ports()`]
-    /// - `baud_rate`: The baud rate to use for the port connection
+    ///   If you are not sure, which ports are allowed use [`tokio_serial::available_ports()`].
+    /// - `baud_rate`: The baud rate to use for the port connection.
     /// - `sending_timeout`: How long to wait for response for the loco net connection
     ///   while sending messages.
     /// - `update_cycles`: How long to wait for incoming messages on reader side,
     ///   before checking if this reader should close.
     /// - `flow_control`: Which mode of flow control to use for this port.
-    ///   It is recommended to use [`FlowControl::Software`]
+    ///   It is recommended to use [`FlowControl::Software`].
     ///
     /// # Error
+    ///
     /// This method exit with an error if the serial port is not reachable or the port could
     /// not be configured correctly.
+    ///
+    /// # Reading
+    ///
+    /// - If this thread communicates a [`LocoNetMessage::SerialPortError`] it will
+    ///   not be receiving any more messages. All other Messages would not lead the reading thread to
+    ///   stop.
+    /// - Lack messages are send twice. Ones as [`LocoNetMessage::Lack`] and then a second time as [`LocoNetMessage::Message`].
     pub async fn new(
         port_name: &str,
         baud_rate: u32,
         sending_timeout: u64,
-        update_cycles: u64,
         flow_control: FlowControl,
         send_to: Sender<LocoNetMessage>,
     ) -> Result<Self, Error> {
@@ -149,7 +140,7 @@ impl LocoNetConnector {
             .stop_bits(StopBits::Two)
             .parity(Parity::None)
             .flow_control(flow_control)
-            .timeout(Duration::from_millis(update_cycles))
+            .timeout(Duration::from_millis(sending_timeout))
             .open_native_async()
         {
             Ok(port) => port,
@@ -161,24 +152,72 @@ impl LocoNetConnector {
         #[cfg(unix)]
         port.set_exclusive(false)?;
 
-        let mut connector = LocoNetConnector {
+        // Takes care of the writer reader synchronisation
+        let send = Arc::new((
+            Arc::new(Mutex::new(vec![0u8; 0])),
+            Arc::new(Condvar::new()),
+            Arc::new(Condvar::new()),
+        ));
+
+        // Used to stop a reader when the the value was dropped
+        let stop = Arc::new(Mutex::new(false));
+        let fire_stop = Arc::new(Notify::new());
+
+        // Starts the reading thread
+        let reading_thread = Some(LocoNetController::start_reading_thread(
+            port_name.to_string(),
+            baud_rate,
+            flow_control,
+            &send,
+            &send_to,
+            &stop,
+            &fire_stop,
+        ).await);
+
+        // All steps has passed successfully
+        Ok(LocoNetController {
             port,
-            send: Arc::new((
-                Arc::new(Mutex::new(vec![0u8; 0])),
-                Arc::new(Condvar::new()),
-                Arc::new(Condvar::new()),
-            )),
-            stop: Arc::new(Mutex::new(false)),
-            fire_stop: Arc::new(Notify::new()),
-            reading_thread: None,
-            sending_timeout,
-            send_to,
-        };
+            send,
+            stop,
+            fire_stop,
+            reading_thread,
+            sending_timeout
+        })
+    }
 
-        // Starts the thread to read
-        connector.start_reader().await;
+    /// # Return
+    ///
+    /// The port the `LocoNetConnector` is connected to.
+    pub fn get_port_name(&self) -> Option<String> {
+        self.port.name()
+    }
 
-        Ok(connector)
+    /// # Return
+    ///
+    /// The connected ports baud rate.
+    pub fn get_baud_rate(&self) -> tokio_serial::Result<u32> {
+        self.port.baud_rate()
+    }
+
+    /// # Return
+    ///
+    /// The maximum time to wait for a message to be send correctly.
+    pub fn get_sending_timeout(&self) -> u64 {
+        self.sending_timeout
+    }
+
+    /// Overrides the sending timeout with the give value.
+    ///
+    /// # Parameter
+    ///
+    /// - `sending_timeout`: The time to wait for a reading action to complete.
+    ///
+    /// # Returns
+    ///
+    /// If some error occurred on overriding the timeout on the port.
+    pub fn set_sending_timeout(&mut self, sending_timeout: u64) -> Result<(), Error> {
+        self.sending_timeout = sending_timeout;
+        self.port.set_timeout(Duration::from_millis(sending_timeout))
     }
 
     /// Stops the async loco net message reader and wait until the tokio thread is joined.
@@ -202,69 +241,16 @@ impl LocoNetConnector {
         }
     }
 
-    /// Start a new thread that is reading new loco net message from the serial port.
-    ///
-    /// Please note:
-    /// - If this thread communicates a [`LocoNetMessage::SerialPortError`] it will
-    /// not be receiving any more messages. All other Messages would not lead the reading thread to
-    /// stop.
-    /// - Lack messages are send ones as [`LocoNetMessage::Lack`] and then a second time as [`LocoNetMessage::Message`]
-    /// - There can be only one thread a time reading from the loco nets serial port.
-    ///
-    /// # Returns
-    ///
-    /// If the async tokio thread was spawned successfully.
-    /// There could be two reasons for the thread to not spawn successfully:
-    /// 1. Another running reading thread exists
-    /// 2. The serial ports configuration is not readable.
-    async fn start_reader(&mut self) -> bool {
-        match self.reading_thread {
-            // Return when a thread is already running
-            Some(_) => false,
-            None => {
-                // Reading needed information to create a port for reading in the reading thread
-                let port = &self.port;
-
-                let port_name = match port.name() {
-                    Some(name) => name,
-                    None => return false,
-                };
-                let baud_rate = match port.baud_rate() {
-                    Ok(name) => name,
-                    Err(_) => return false,
-                };
-                let flow_control = match port.flow_control() {
-                    Ok(name) => name,
-                    Err(_) => return false,
-                };
-
-                // Starts the new thread and saves the threads join
-                // handle to indicate this thread as actually running.
-                self.reading_thread = Some(
-                    LocoNetConnector::start_reading_thread(
-                        port_name,
-                        baud_rate,
-                        flow_control,
-                        &self.send,
-                        &self.send_to,
-                        &self.stop,
-                        &self.fire_stop,
-                    ).await
-                );
-                true
-            }
-        }
-    }
-
     /// Helper method that spawns a new async tokio thread for reading loco net
     /// messages from the specified serial port.
     ///
     /// # Parameter
+    ///
     /// - `port_name`: The name of the serial port to read from
     /// - `baud_rate`: The baud rate to use
     /// - `flow_control`: The used [`FlowControl`]
     /// - `send`: The information to free the writer when rechecking that the message is received by the loco net
-    /// - `send_to`: Where to send the received and parsed `LocoNet` messages.
+    /// - `send_to`: Where to send the received and parsed `LocoNet` messages
     /// - `wait_to`: A mutex indicates this thread to stop.
     /// - `stopping`: A notify used to awake the reading thread from waiting for new incoming messages
     ///
@@ -338,7 +324,7 @@ impl LocoNetConnector {
             // This thread reads till it is notified to stop
             while !*new_arc_wait_to.lock().unwrap() {
                 // We read and directly handle received messages
-                LocoNetConnector::handle_next_message(
+                LocoNetController::handle_next_message(
                     &mut port,
                     &new_arc_send_locked,
                     &mut lack,
@@ -356,6 +342,7 @@ impl LocoNetConnector {
     /// Handles a `LocoNet` message after it was parsed successfully.
     ///
     /// # Parameter
+    ///
     /// - `port`: The port to read messages from
     /// - `send`: The information to free the writer when rechecking that the message is received by the loco net
     /// - `lack`: Whether the last received message expects a lack to follow
@@ -365,13 +352,13 @@ impl LocoNetConnector {
     async fn handle_next_message<'a>(
         port: &mut SerialStream,
         send: &ReferencedSendSynchronisation<'a>,
-        lack: &mut bool,
+        await_response: &mut bool,
         last_message: &mut Message,
         send_to: &Sender<LocoNetMessage>,
         stopping: &Arc<Notify>,
     ) {
         // We read the next message from the serial port
-        let parsed = LocoNetConnector::read_next_message(port, send, stopping).await;
+        let parsed = LocoNetController::read_next_message(port, send, stopping).await;
 
         // We check which type the message we received is
         match parsed {
@@ -382,28 +369,42 @@ impl LocoNetConnector {
                 if let Err(err) = send_to.send(LocoNetMessage::Error(err)).await {
                     eprintln!("[locodrive:ERROR] {:?}", err);
                 };
-                *lack = false;
+                *await_response = false;
             }
             Ok(message) => {
-                // If our last received message expects a long acknowledgment to follow, we check
-                // for this acknowledgment message to be received
-                if *lack {
-                    if let Message::LongAck(_, _) = message {
-                        // We notify our listener of that long acknowledgment
-                        if let Err(err) = send_to.send(
-                            LocoNetMessage::Lack(message, *last_message)
-                        ).await {
-                            eprintln!("[locodrive:ERROR] {:?}", err);
-                        };
+                // If our last received message expects a response message to follow, we check
+                // for this response message to be received
+                if *await_response {
+                    match message {
+                        Message::LongAck(lopc, _) => {
+                            if lopc.check_opc(last_message) {
+                                // We notify our listener of that long acknowledgment
+                                if let Err(err) = send_to.send(
+                                    LocoNetMessage::Answer(message, *last_message)
+                                ).await {
+                                    eprintln!("[locodrive:ERROR] {:?}", err);
+                                };
+                            }
+                        }
+                        Message::SlRdData(..) => {
+                            if last_message.await_slot_data() {
+                                if let Err(err) = send_to.send(
+                                    LocoNetMessage::Answer(message, *last_message)
+                                ).await {
+                                    eprintln!("[locodrive:ERROR] {:?}", err);
+                                };
+                            }
+                        }
+                        _ => {}
                     }
                 }
 
                 // Checks whether our message is followed by an acknowledgment
-                if message.lack_follows() {
-                    *lack = true;
+                if message.answer_follows() {
+                    *await_response = true;
                     *last_message = message;
-                } else {
-                    *lack = false;
+                } else if Message::Busy != message {
+                    *await_response = false;
                 }
 
                 // We at least notify our listener about the received message
@@ -414,9 +415,10 @@ impl LocoNetConnector {
         }
     }
 
-    /// Waits for the next `LocoNet` message and reads that message from a given serial port
+    /// Waits for the next `LocoNet` message and reads that message from a given serial port.
     ///
     /// # Parameter
+    ///
     /// - `port`: The serial port to read the message from
     /// - `send`: Used to notify the writer that the `LocoNet` has successfully received the send message
     /// - `stopping`: This is used to notify this thread to awake from waiting at new messages
@@ -428,7 +430,8 @@ impl LocoNetConnector {
     /// [`MessageParseError::Update`]: If a notification was send over `stopping` to awake
     ///
     /// # Note
-    /// This method sleeps until a message was received as long as the maximum timeout is set
+    ///
+    /// This method sleeps until a message was received as long as the maximum timeout is set.
     async fn read_next_message<'a>(
         port: &mut SerialStream,
         send: &ReferencedSendSynchronisation<'a>,
@@ -489,18 +492,19 @@ impl LocoNetConnector {
         }
 
         // We now parse the read bytes to our message
-        Message::parse(buf.as_slice(), opc, len)
+        Message::parse(buf.as_slice())
     }
 
-    /// Sends a Message to the `LocoNet`
+    /// Sends a Message to the `LocoNet`.
     ///
     /// # Parameter
+    ///
     /// - `message`: The message to send to the `LocoNet`s serial port
     ///
     /// # Return
     ///
     /// If the message was successfully written nothing is returned else
-    /// an [`LocoNetSendingError`] describing the reason for the fail of the writing is returned
+    /// an [`LocoNetSendingError`] describing the reason for the fail of the writing is returned.
     pub async fn send_message(&mut self, message: Message) -> Result<(), LocoNetSendingError> {
         // If we have no reading thread we raise an error, that should not be possible
         if self.reading_thread.is_none() {
@@ -557,11 +561,15 @@ impl LocoNetConnector {
     }
 }
 
-/// Extends standard drop implementation to close the reading thread
-impl Drop for LocoNetConnector {
+/// Extends standard drop implementation to close the reading thread.
+impl Drop for LocoNetController {
     /// Handles drop Actions for the [`LocoNetConnector`].
     ///
     /// In detail: We stop and join our reading thread on drop.
+    ///
+    /// # Panics
+    ///
+    /// The drop panics if the reading thread has panicked.
     fn drop(&mut self) {
         let runtime = match tokio::runtime::Runtime::new() {
             Ok(runtime) => runtime,

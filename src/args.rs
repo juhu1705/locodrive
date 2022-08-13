@@ -3,6 +3,7 @@
 use std::fmt::{Debug, Display, Formatter};
 use std::time::Duration;
 use crate::error::MessageParseError;
+use crate::protocol::Message;
 
 #[derive(Debug, Copy, Clone, Eq)]
 pub struct AddressArg(u16);
@@ -433,9 +434,13 @@ impl Debug for SndArg {
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum Consist {
+    /// Slot is linked up and down
     LogicalMid,
+    /// Slot is only linked down
     LogicalTop,
+    /// Slot is only linked up
     LogicalSubMember,
+    /// Slot is not linked
     Free,
 }
 
@@ -617,7 +622,7 @@ pub struct LopcArg(u8);
 
 impl LopcArg {
     pub fn parse(lopc: u8) -> Self {
-        Self(lopc & !0x40)
+        Self(lopc & !0x80)
     }
 
     pub fn lopc(&self) -> u8 {
@@ -625,7 +630,11 @@ impl LopcArg {
     }
 
     pub fn set_lopc(&mut self, lopc: u8) {
-        self.0 = lopc & !0x40
+        self.0 = lopc & !0x80
+    }
+
+    pub fn check_opc(&self, message: &Message) -> bool {
+        message.opc() & !0x80 == self.0
     }
 }
 
@@ -642,7 +651,11 @@ impl Ack1Arg {
     }
 
     pub fn success(&self) -> bool {
-        self.0 != 0
+        self.0 == 0x7F
+    }
+
+    pub fn limited_success(&self) -> bool {
+        self.0 != 0x00
     }
 
     pub fn failed(&self) -> bool {
@@ -2638,4 +2651,119 @@ impl PxctData {
     pub fn d8(&self) -> u8 {
         self.d8 & 0x3F
     }
+}
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub struct ProgrammingAbortedArg {
+    pub arg_len: u8,
+    pub arg1: u8,
+    pub arg2: u8,
+    pub arg3: u8,
+    pub arg4: u8,
+    pub arg5: u8,
+    pub arg6: u8,
+    pub arg7: u8,
+    pub arg8: u8,
+    pub arg9: u8,
+    pub arg10: u8,
+    pub arg11: u8,
+    pub arg12: u8,
+    pub arg13: u8,
+    pub arg14: u8,
+    pub arg15: u8,
+    pub arg16: u8,
+    pub arg17: u8,
+    pub arg18: u8,
+}
+
+impl ProgrammingAbortedArg {
+    pub(crate) fn parse(len: u8, args: &[u8]) -> Self {
+        match len {
+            0x10 => ProgrammingAbortedArg {
+                arg_len: len,
+                arg1: args[0],
+                arg2: args[1],
+                arg3: args[2],
+                arg4: args[3],
+                arg5: args[4],
+                arg6: args[5],
+                arg7: args[6],
+                arg8: args[7],
+                arg9: args[8],
+                arg10: args[9],
+                arg11: args[10],
+                arg12: 0,
+                arg13: 0,
+                arg14: 0,
+                arg15: 0,
+                arg16: 0,
+                arg17: 0,
+                arg18: 0,
+            },
+            len => ProgrammingAbortedArg {
+                arg_len: len,
+                arg1: args[0],
+                arg2: args[1],
+                arg3: args[2],
+                arg4: args[3],
+                arg5: args[4],
+                arg6: args[5],
+                arg7: args[6],
+                arg8: args[7],
+                arg9: args[8],
+                arg10: args[9],
+                arg11: args[10],
+                arg12: args[11],
+                arg13: args[12],
+                arg14: args[13],
+                arg15: args[14],
+                arg16: args[15],
+                arg17: args[16],
+                arg18: args[17],
+            }
+        }
+    }
+
+    pub(crate) fn to_message(self) -> Vec<u8> {
+        match self.arg_len {
+            0x10 => vec![
+                0xE6,
+                0x10,
+                self.arg1,
+                self.arg2,
+                self.arg3,
+                self.arg4,
+                self.arg5,
+                self.arg6,
+                self.arg7,
+                self.arg9,
+                self.arg10,
+                self.arg11,
+                self.arg12,
+                self.arg13,
+            ],
+            _ => vec![
+                0xE6,
+                0x15,
+                self.arg1,
+                self.arg2,
+                self.arg3,
+                self.arg4,
+                self.arg5,
+                self.arg6,
+                self.arg7,
+                self.arg9,
+                self.arg10,
+                self.arg11,
+                self.arg12,
+                self.arg13,
+                self.arg14,
+                self.arg15,
+                self.arg16,
+                self.arg17,
+                self.arg18,
+            ],
+        }
+    }
+
 }
