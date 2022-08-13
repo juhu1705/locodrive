@@ -82,7 +82,7 @@ pub enum Message {
     ///
     /// [`Message::SlRdData`] containing all slot information.
     ///
-    /// # Failure
+    /// # Fail
     ///
     /// [`Message::LongAck`] with [`Ack1Arg::failed()`]
     /// Meaning slot data could not be moved.
@@ -93,7 +93,7 @@ pub enum Message {
     ///
     /// [`Message::SlRdData`] containing slot information.
     ///
-    /// # Failure
+    /// # Fail
     ///
     /// [`Message::LongAck`] with [`Ack1Arg::failed()`]
     /// Meaning slot data could not be linked.
@@ -104,7 +104,7 @@ pub enum Message {
     ///
     /// [`Message::SlRdData`] containing slot information.
     ///
-    /// # Failure
+    /// # Fail
     ///
     /// [`Message::LongAck`] with [`Ack1Arg::failed()`]
     /// Meaning slot data could not be linked.
@@ -131,7 +131,7 @@ pub enum Message {
     /// Requests a switch function. More precisely requests a switch to switch to a
     /// specific direction and activation.
     ///
-    /// # Failure
+    /// # Fail
     ///
     /// [`Message::LongAck`] with [`Ack1Arg::failed()`]
     /// Meaning the requested action could not be performed.
@@ -155,7 +155,7 @@ pub enum Message {
     ///
     /// [`Message::LongAck`] with [`Ack1Arg::success()`]
     ///
-    /// # Failure
+    /// # Fail
     ///
     /// [`Message::LongAck`] with [`Ack1Arg::failed()`]
     WrSlData(WrSlDataStructure),
@@ -426,7 +426,7 @@ impl Message {
         return msg.iter().fold(0, |acc, &b| acc ^ b) == 0xFF;
     }
 
-    /// Parses the given [`Message`] to a [`Vec<u8>`] in the by the `LocoNet` protocol specified format.
+    /// Parses the given [`Message`] to a [`Vec<u8>`] using the `LocoNet` protocol.
     pub fn to_message(self) -> Vec<u8> {
         // Parses the message
         let mut message = match self {
@@ -529,7 +529,9 @@ impl Message {
         0xFF - msg.iter().fold(0, |acc, &b| acc ^ b)
     }
 
-    /// Returns the op code for the specified message
+    /// # Returns
+    ///
+    /// The op code for the specified message
     pub fn opc(&self) -> u8 {
         match *self {
             Message::Idle => 0x85,

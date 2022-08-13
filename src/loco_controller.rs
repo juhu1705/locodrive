@@ -12,7 +12,7 @@ use tokio_serial::{DataBits, Error, FlowControl, Parity, SerialPort, SerialPortB
 /// This message is sent when data are received from the LocoNet.
 #[derive(Debug, Clone)]
 pub enum LocoNetMessage {
-    /// A normal LocoNet message. Consider that all [`LocoNetMessage::Lack`] messages are also send this way.
+    /// A normal LocoNet message. Consider that all [`LocoNetMessage::Answer`] messages are also send this way.
     Message(Message),
     /// This is a response for the before received message.
     /// The response message is represent by the first argument and
@@ -37,10 +37,10 @@ type ReferencedSendSynchronisation<'a> = Arc<(&'a Arc<Mutex<Vec<u8>>>, &'a Arc<C
 ///
 /// # Usage
 ///
-/// To send a message see [`LocoNetConnector::send_message()`].
+/// To send a message see [`LocoNetController::send_message()`].
 /// The reading thread is start automatically on port creation.
 /// You can just check on your reader channel for new messages.
-/// The reader is automatically dropped when the [`LocoNetConnector`] is dropped.
+/// The reader is automatically dropped when the [`LocoNetController`] is dropped.
 ///
 /// # Examples
 ///
@@ -124,9 +124,10 @@ impl LocoNetController {
     /// # Reading
     ///
     /// - If this thread communicates a [`LocoNetMessage::SerialPortError`] it will
-    ///   not be receiving any more messages. All other Messages would not lead the reading thread to
-    ///   stop.
-    /// - Lack messages are send twice. Ones as [`LocoNetMessage::Lack`] and then a second time as [`LocoNetMessage::Message`].
+    ///   not be receiving any more messages. All other Messages would not lead
+    ///   the reading thread to stop.
+    /// - Lack messages are send twice. Ones as [`LocoNetMessage::Answer`] and
+    ///   then a second time as [`LocoNetMessage::Message`].
     pub async fn new(
         port_name: &str,
         baud_rate: u32,
@@ -563,7 +564,7 @@ impl LocoNetController {
 
 /// Extends standard drop implementation to close the reading thread.
 impl Drop for LocoNetController {
-    /// Handles drop Actions for the [`LocoNetConnector`].
+    /// Handles drop Actions for the [`LocoNetController`].
     ///
     /// In detail: We stop and join our reading thread on drop.
     ///

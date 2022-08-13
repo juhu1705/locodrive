@@ -39,11 +39,11 @@ impl From<io::Error> for MessageParseError {
     }
 }
 
-/// This error type is used to describe errors appearing on [`LocoNetConnector::send_message()`]
+/// This error type is used to describe errors appearing on [`crate::loco_controller::LocoNetController::send_message()`]
 #[derive(Debug, Copy, Clone)]
 pub enum LocoNetSendingError {
     /// If the reader is closed. This should not happen normally.
-    /// If it happens your [`LocoNetConnector`] is corrupted and can no longer be used.
+    /// If it happens your [`crate::loco_controller::LocoNetController`] is corrupted and can no longer be used.
     IllegalState,
     /// The `LocoNet` does not respond in the specified time.
     Timeout,
