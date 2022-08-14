@@ -1,5 +1,4 @@
-# Sample workflow for building and deploying a Jekyll site to GitHub Pages
-name: Deploy Jekyll with GitHub Pages dependencies preinstalled
+name: Docs
 
 on:
   # Runs on pushes targeting the default branch
@@ -30,7 +29,9 @@ jobs:
       - name: Setup Pages
         uses: actions/configure-pages@v1
       - name: Build Rust documentation
-        run: cargo doc --target-dir "./_site"
+        run: cargo doc --no-deps --target-dir "./_site"
+      - name: Add index page
+        run: echo "<meta http-equiv=\"refresh\" content=\"0; url=build_wheel\">" > ./_site/index.html
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v1
 
