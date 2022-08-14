@@ -5,67 +5,88 @@ use std::time::Duration;
 use crate::error::MessageParseError;
 use crate::protocol::Message;
 
-#[derive(Debug, Copy, Clone, Eq)]
+/// Represents a `LocoNet` address of 14 byte length.
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct AddressArg(u16);
 
-/// This arg represents a loco net address of 14 byte length.
 impl AddressArg {
-    /**
-     * Creates a new loco net address.
-     * Please consider to keep in range of 14 bytes.
-     */
+    /// Creates a new address.
+    ///
+    /// Please consider keeping in range between 0 and 16383.
+    /// Higher values may not be send correctly to the `LocoNet`.
     pub fn new(adr: u16) -> Self {
         Self(adr)
     }
 
-    pub fn parse(adr2: u8, adr: u8) -> Self {
+    /// Parses the message bytes from an `LocoNet` message into an `AddressArg`
+    ///
+    /// # Parameters
+    ///
+    /// - `adr`: seven least significant loco address bits
+    /// - `adr2`: seven most significant loco address bits
+    pub(crate) fn parse(adr2: u8, adr: u8) -> Self {
         let mut address = adr as u16;
         address |= (adr2 as u16) << 7;
         Self(address)
     }
 
+    /// # Returns
+    ///
+    /// The address hold by this arg
     pub fn address(&self) -> u16 {
         self.0
     }
 
+    /// Sets the address hold by this [`AddressArg`]
+    ///
+    /// Please consider keeping in range between 0 and 16383.
+    /// Higher values may not be send correctly to the `LocoNet`.
     pub fn set_address(&mut self, address: u16) {
-        debug_assert_eq!(
-            address & 0x3FFF,
-            0,
-            "address must only use the 14 least significant bits"
-        );
         self.0 = address;
     }
 
-    pub fn adr1(&self) -> u8 {
+    /// # Returns
+    ///
+    /// The low part of this address to send to the `LocoNet`
+    pub(crate) fn adr1(&self) -> u8 {
         (self.0 & 0x007F) as u8
     }
 
-    pub fn adr2(&self) -> u8 {
+    /// # Returns
+    ///
+    /// The high part of this address to send to the `LocoNet`
+    pub(crate) fn adr2(&self) -> u8 {
         ((self.0 >> 7) & 0x007F) as u8
     }
 }
 
-impl PartialEq for AddressArg {
-    fn eq(&self, other: &Self) -> bool {
-        self.0 == other.0
-    }
-}
-
+/// Which direction state a switch is orientated to
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum SwitchDirection {
     Straight,
     Curved,
 }
 
-#[derive(Debug, Copy, Clone, Eq)]
+/// Holds switch state information to be read or write
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct SwitchArg {
+    /// The address of the switch (0 - 2047)
     address: u16,
+    /// The switches direction state
     direction: SwitchDirection,
+    /// The activation state of the switch (`true = ON, false = OFF`)
     state: bool,
 }
 
 impl SwitchArg {
+    /// Creates a new switch information block that can be send to update a switch in a
+    /// `LocoNet` system using the corresponding [`crate::protocol::Message::SwReq`] message.
+    ///
+    /// # Parameters
+    ///
+    /// - `address`: The address of the switch you want to change state (0 to 2047)
+    /// - `direction`: The direction the switch should switch to
+    /// - `state`: The activation state of the switch (`true = ON`, `false = OFF`)
     pub fn new(address: u16, direction: SwitchDirection, state: bool) -> Self {
         Self {
             address,
@@ -74,6 +95,14 @@ impl SwitchArg {
         }
     }
 
+    /// Parses the arguments of an incomming loco net message to a [`SwitchArg`]
+    ///
+    /// # Parameters
+    ///
+    /// - `sw1`: Seven least significant switch address bits
+    /// - `sw2`: four most significant switch address bits,
+    ///          1 bit for direction and
+    ///          1 bit for activation state
     pub(crate) fn parse(sw1: u8, sw2: u8) -> Self {
         let mut address = sw1 as u16;
         address |= (sw2 as u16 & 0x0F) << 7;
@@ -92,36 +121,61 @@ impl SwitchArg {
         }
     }
 
+    /// # Returns
+    ///
+    /// The address of the switch
     pub fn address(&self) -> u16 {
         self.address
     }
+    /// # Returns
+    ///
+    /// The switches direction state
     pub fn direction(&self) -> SwitchDirection {
         self.direction
     }
+    /// # Returns
+    ///
+    /// The switches activation status (`true = ON, false = OFF`)
     pub fn state(&self) -> bool {
         self.state
     }
 
+    /// Sets the address of the switch to use
+    ///
+    /// # Parameters
+    ///
+    /// - `address`: The switches address (0 - 2047)
     pub fn set_address(&mut self, address: u16) {
-        debug_assert_eq!(
-            address & 0x07FF,
-            0,
-            "address must only use the 11 least significant bits"
-        );
         self.address = address;
     }
+    /// Sets the direction to switch to
+    ///
+    /// # Parameters
+    ///
+    /// - `direction`: The switches direction
     pub fn set_direction(&mut self, direction: SwitchDirection) {
         self.direction = direction;
     }
+    /// Sets the activation state of the switch
+    ///
+    /// # Parameters
+    ///
+    /// - `state`: The switches activation state to set (`true = ON, false = OFF`)
     pub fn set_state(&mut self, state: bool) {
         self.state = state;
     }
 
-    pub fn sw1(&self) -> u8 {
+    /// # Returns
+    ///
+    /// The seven least significant address bits
+    pub(crate) fn sw1(&self) -> u8 {
         (self.address & 0x007F) as u8
     }
 
-    pub fn sw2(&self) -> u8 {
+    /// # Returns
+    ///
+    /// The four most significant address bits combined with a direction state and activation state
+    pub(crate) fn sw2(&self) -> u8 {
         let mut sw2 = ((self.address >> 7) & 0x000F) as u8;
 
         sw2 |= match self.direction {
@@ -134,14 +188,6 @@ impl SwitchArg {
         }
 
         sw2
-    }
-}
-
-impl PartialEq for SwitchArg {
-    fn eq(&self, other: &Self) -> bool {
-        self.address == other.address
-            && self.state == other.state
-            && self.direction == other.direction
     }
 }
 
