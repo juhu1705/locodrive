@@ -1,4 +1,4 @@
-# LocoDrive [![Rust](https://github.com/juhu1705/locodrive-rust/actions/workflows/rust.yml/badge.svg)](https://github.com/juhu1705/locodrive-rust/actions/workflows/rust.yml)[![Doc](https://github.com/juhu1705/Locodrive/actions/workflows/codeql-release.yml/badge.svg)](https://github.com/juhu1705/Locodrive/actions/workflows/codeql-release.yml)
+# LocoDrive [![Tests](https://github.com/juhu1705/locodrive-rust/actions/workflows/rust.yml/badge.svg?branch=main)](https://github.com/juhu1705/locodrive-rust/actions/workflows/rust.yml)[![Docs](https://github.com/juhu1705/locodrive-rust/actions/workflows/doc.yml/badge.svg?branch=main)](https://github.com/juhu1705/locodrive-rust/actions/workflows/doc.yml)
 
 A rust library for controlling a model train railroad based on the `LocoNet` system.
 
