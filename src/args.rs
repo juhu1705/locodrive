@@ -1,7 +1,6 @@
 #![allow(clippy::too_many_arguments)]
 
 use std::fmt::{Debug, Display, Formatter};
-use std::time::Duration;
 use crate::error::MessageParseError;
 use crate::protocol::Message;
 
@@ -191,6 +190,17 @@ impl SwitchArg {
     }
 }
 
+///
+/// # Slots
+///
+/// | Nr.     | Function                           |
+/// |---------|------------------------------------|
+/// | 0       | dispatch                           |
+/// | 1-119   | active locs                        |
+/// | 120-127 | reserved (system / master control) |
+/// | - 123   | fast clock                         |
+/// | - 124   | programming track                  |
+/// | - 127   | command station options            |
 #[derive(Debug, Copy, Clone, Eq)]
 pub struct SlotArg(u8);
 
@@ -625,7 +635,7 @@ impl Stat2Arg {
         }
     }
 
-    pub fn parse(stat2: u8) -> Self {
+    pub(crate) fn parse(stat2: u8) -> Self {
         let has_adv = stat2 & 0x01 != 0;
 
         let no_id_usage = stat2 & 0x04 != 0;
@@ -667,16 +677,20 @@ impl Stat2Arg {
 pub struct LopcArg(u8);
 
 impl LopcArg {
-    pub fn parse(lopc: u8) -> Self {
+    pub fn new(opc: u8) -> Self {
+        LopcArg::parse(opc)
+    }
+
+    pub(crate) fn parse(lopc: u8) -> Self {
         Self(lopc & !0x80)
     }
 
-    pub fn lopc(&self) -> u8 {
+    pub(crate) fn lopc(&self) -> u8 {
         self.0
     }
 
-    pub fn set_lopc(&mut self, lopc: u8) {
-        self.0 = lopc & !0x80
+    pub fn set_opc(&mut self, opc: u8) {
+        self.0 = opc & !0x80
     }
 
     pub fn check_opc(&self, message: &Message) -> bool {
@@ -688,7 +702,11 @@ impl LopcArg {
 pub struct Ack1Arg(u8);
 
 impl Ack1Arg {
-    pub fn parse(ack1: u8) -> Self {
+    pub fn new(code: u8) -> Self {
+        Self(code)
+    }
+
+    pub(crate) fn parse(ack1: u8) -> Self {
         Self(ack1)
     }
 
@@ -887,13 +905,25 @@ pub struct SnArg {
 
 impl SnArg {
     pub fn new_c_t(address: u16, c: bool, t: bool) -> Self {
+        let input_source = if c {
+            SourceType::Switch
+        } else {
+            SourceType::Ds54Aux
+        };
+
+        let sensor_level = if t {
+            SensorLevel::High
+        } else {
+            SensorLevel::Low
+        };
+
         SnArg {
             address: address & 0x07FF,
             format: false,
             c,
             t,
-            input_source: SourceType::Ds54Aux,
-            sensor_level: SensorLevel::Low,
+            input_source,
+            sensor_level,
         }
     }
 
@@ -914,8 +944,8 @@ impl SnArg {
 
         let format = sn2 & 0x40 == 0x40;
 
-        let c = sn2 & 0x10 == 0x10;
-        let t = sn2 & 0x20 == 0x20;
+        let t = sn2 & 0x10 == 0x10;
+        let c = sn2 & 0x20 == 0x20;
 
         let input_source = if c {
             SourceType::Switch
@@ -1131,7 +1161,7 @@ impl MultiSenseArg {
     }
 
     pub fn parse(m_high: u8, zas: u8) -> Self {
-        let m_type = 0xE0 & m_high >> 5;
+        let m_type = (0xE0 & m_high) >> 5;
         let present = 0x10 & m_high == 0x10;
         let board_address = ((0x0F & m_high) << 4) | ((zas & 0xF0) >> 4);
         let zone = 0x0F & zas;
@@ -1444,7 +1474,11 @@ impl PStat {
 pub struct CvDataArg(u16, u8);
 
 impl CvDataArg {
-    pub fn parse(cvh: u8, cvl: u8, data7: u8) -> Self {
+    pub fn new() -> CvDataArg {
+        CvDataArg(0, 0)
+    }
+
+    pub(crate) fn parse(cvh: u8, cvl: u8, data7: u8) -> Self {
         let mut cv_arg = cvl as u16;
         let data = ((cvh & 0x02) << 6) | data7;
 
@@ -1464,7 +1498,7 @@ impl CvDataArg {
         self.0 >> cv_num & 1 != 0
     }
 
-    pub fn set_data(&mut self, d_num: u8, value: bool) {
+    pub fn set_data(&mut self, d_num: u8, value: bool) -> &mut Self {
         let mask = 1 << d_num;
 
         if value {
@@ -1472,15 +1506,20 @@ impl CvDataArg {
         } else {
             self.1 &= !mask;
         }
+
+        self
     }
 
-    pub fn set_cv(&mut self, cv_num: u8, value: bool) {
+    pub fn set_cv(&mut self, cv_num: u8, value: bool) -> &mut Self {
         let mask = (1 << cv_num) & 0x03FF;
+
         if value {
             self.0 |= mask;
         } else {
             self.0 &= !mask;
         }
+
+        self
     }
 
     pub fn cvh(&self) -> u8 {
@@ -1535,12 +1574,34 @@ pub struct FastClock {
     clk_rate: u8,
     frac_minsl: u8,
     frac_minsh: u8,
-    duration: Duration,
+    mins: u8,
+    hours: u8,
+    days: u8,
     clk_cntrl: u8,
 }
 
 impl FastClock {
-    pub fn parse(
+    pub fn new(
+        clk_rate: u8,
+        frac_minsl: u8,
+        frac_minsh: u8,
+        mins: u8,
+        hours: u8,
+        days: u8,
+        clk_cntrl: u8
+    ) -> Self {
+        FastClock::parse(
+            clk_rate,
+            frac_minsl,
+            frac_minsh,
+            mins,
+            hours,
+            days,
+            clk_cntrl
+        )
+    }
+
+    pub(crate) fn parse(
         clk_rate: u8,
         frac_minsl: u8,
         frac_minsh: u8,
@@ -1549,18 +1610,13 @@ impl FastClock {
         days: u8,
         clk_cntrl: u8,
     ) -> Self {
-        let min = mins % 60 - 0xFF;
-        let hour = hours % 60 - 0xFF;
-
-        let secs: u64 = min as u64 * 60 + hour as u64 * 60 * 60 + days as u64 * 24 * 60 * 60;
-
-        let duration = Duration::new(secs, 0);
-
         FastClock {
             clk_rate: clk_rate & 0x7F,
             frac_minsl,
             frac_minsh,
-            duration,
+            mins,
+            hours,
+            days,
             clk_cntrl,
         }
     }
@@ -1577,20 +1633,16 @@ impl FastClock {
         self.frac_minsh
     }
 
-    pub fn duration(&self) -> Duration {
-        self.duration
-    }
-
     fn mins(&self) -> u8 {
-        0xFF - (self.duration.as_secs() % 60) as u8
+        self.mins
     }
 
     fn hours(&self) -> u8 {
-        0xFF - (self.duration.as_secs() / 60 % 60) as u8
+        self.hours
     }
 
     fn days(&self) -> u8 {
-        0xFF - (self.duration.as_secs() / 60 / 60 % 24) as u8
+        self.days
     }
 
     pub fn clk_cntrl(&self) -> u8 {
@@ -1599,35 +1651,44 @@ impl FastClock {
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub enum ImFunctionType {
+    F9to12,
+    F13to20,
+    F21to28
+}
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub enum ImAddress {
+    Short(u8),
+    Long(u16)
+}
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct ImArg {
-    reps: u8,
     dhi: u8,
-    address: u16,
-    function_type: u8,
+    address: ImAddress,
+    function_type: ImFunctionType,
     function_bits: u8,
     im5: u8,
 }
 
 impl ImArg {
     pub fn new(
-        reps: u8,
         dhi: u8,
-        address: u16,
-        function_type: u8,
-        function_bits: u8,
+        address: ImAddress,
+        function_type: ImFunctionType,
         im5: u8,
     ) -> Self {
         ImArg {
-            reps,
             dhi,
             address,
             function_type,
-            function_bits,
+            function_bits: 0x00,
             im5,
         }
     }
 
-    pub fn parse(
+    pub(crate) fn parse(
         _: u8,
         reps: u8,
         dhi: u8,
@@ -1637,26 +1698,25 @@ impl ImArg {
         im4: u8,
         im5: u8,
     ) -> ImArg {
-        if reps == 0x44 || (reps == 0x34 && im4 == 0x00) {
-            let address = ((im2 as u16) << 8) | im1 as u16;
+        if reps == 0x44 || (reps == 0x34 && (im3 & 0x20) == 0x20) {
+            let address = ImAddress::Long(((im2 as u16) << 8) | im1 as u16);
 
             let function_type = if im3 == 0x5E {
-                0x5E
+                ImFunctionType::F13to20
             } else if im3 == 0x5F {
-                0x5F
+                ImFunctionType::F21to28
             } else {
-                0x20
+                ImFunctionType::F9to12
             };
-            let mut function_bits = if function_type == 0x5E || function_type == 0x5F {
-                im4
-            } else {
-                im3
+            let mut function_bits = match function_type {
+                ImFunctionType::F21to28 => im4,
+                ImFunctionType::F13to20 => im4,
+                ImFunctionType::F9to12 => im3 & !0x20,
             };
 
             function_bits &= 0x7F;
 
             Self {
-                reps,
                 dhi,
                 address,
                 function_type,
@@ -1664,25 +1724,24 @@ impl ImArg {
                 im5,
             }
         } else {
-            let address = im1 as u16;
+            let address = ImAddress::Short(im1);
 
-            let function_type = if im3 == 0x5E {
-                0x5E
-            } else if im3 == 0x5F {
-                0x5F
+            let function_type = if im2 == 0x5E {
+                ImFunctionType::F13to20
+            } else if im2 == 0x5F {
+                ImFunctionType::F21to28
             } else {
-                0x20
+                ImFunctionType::F9to12
             };
-            let mut function_bits = if function_type == 0x5E || function_type == 0x5F {
-                im3
-            } else {
-                im2 & 0xDF
+            let mut function_bits = match function_type {
+                ImFunctionType::F13to20 => im3,
+                ImFunctionType::F21to28 => im3,
+                ImFunctionType::F9to12 => im2 & !0x2F,
             };
 
             function_bits &= 0x7F;
 
             Self {
-                reps,
                 dhi,
                 address,
                 function_type,
@@ -1697,18 +1756,29 @@ impl ImArg {
     }
 
     pub fn reps(&self) -> u8 {
-        self.reps
+        match self.address {
+            ImAddress::Short(_) => match self.function_type {
+                ImFunctionType::F9to12 => 0x24,
+                ImFunctionType::F13to20 => 0x34,
+                ImFunctionType::F21to28 => 0x34,
+            }
+            ImAddress::Long(_) => match self.function_type {
+                ImFunctionType::F9to12 => 0x34,
+                ImFunctionType::F13to20 => 0x44,
+                ImFunctionType::F21to28 => 0x44,
+            }
+        }
     }
 
     pub fn dhi(&self) -> u8 {
         self.dhi
     }
 
-    pub fn address(&self) -> u16 {
+    pub fn address(&self) -> ImAddress {
         self.address
     }
 
-    pub fn function_type(&self) -> u8 {
+    pub fn function_type(&self) -> ImFunctionType {
         self.function_type
     }
 
@@ -1717,25 +1787,21 @@ impl ImArg {
     }
 
     pub fn f(&self, f_num: u8) -> bool {
-        let dist = if self.function_type == 0x5E {
-            21
-        } else if self.function_type == 0x5F {
-            13
-        } else {
-            9
-        } as u8;
+        let dist = match self.function_type {
+            ImFunctionType::F13to20 => 21,
+            ImFunctionType::F21to28 => 13,
+            ImFunctionType::F9to12 => 9,
+        };
 
         (self.function_bits >> (f_num - dist)) & 0x01 == 0x01
     }
 
     pub fn set_f(&mut self, f_num: u8, f: bool) {
-        let dist = if self.function_type == 0x5E {
-            21
-        } else if self.function_type == 0x5F {
-            13
-        } else {
-            9
-        } as u8;
+        let dist = match self.function_type {
+            ImFunctionType::F13to20 => 21,
+            ImFunctionType::F21to28 => 13,
+            ImFunctionType::F9to12 => 9,
+        };
 
         let mask = 0x01 << (f_num - dist);
 
@@ -1747,35 +1813,48 @@ impl ImArg {
     }
 
     pub fn im1(&self) -> u8 {
-        self.address as u8
+        match self.address {
+            ImAddress::Short(adr) => adr,
+            ImAddress::Long(adr) => adr as u8,
+        }
     }
 
     pub fn im2(&self) -> u8 {
-        if self.reps == 0x34 {
-            (self.address >> 8) as u8
-        } else if self.function_type == 0x20 {
-            self.function_bits | 0x20
-        } else {
-            self.function_type
+        match self.address {
+            ImAddress::Short(_) => {
+                match self.function_type {
+                    ImFunctionType::F9to12 => (self.function_bits & 0x7F) | 0x20,
+                    ImFunctionType::F13to20 => 0x5E,
+                    ImFunctionType::F21to28 => 0x5F,
+                }
+            },
+            ImAddress::Long(adr) => {
+                (adr >> 8) as u8
+            }
         }
     }
 
     pub fn im3(&self) -> u8 {
-        if self.reps() == 0x34 {
-            if self.function_type == 0x20 {
-                self.function_bits | 0x20
-            } else {
-                self.function_type
+        match self.address {
+            ImAddress::Short(_) => {
+                if self.function_type == ImFunctionType::F9to12 {
+                    0x00
+                } else {
+                    self.function_bits
+                }
+            },
+            ImAddress::Long(_) => {
+                match self.function_type {
+                    ImFunctionType::F9to12 => (self.function_bits & 0x7F) | 0x20,
+                    ImFunctionType::F13to20 => 0x5E,
+                    ImFunctionType::F21to28 => 0x5F,
+                }
             }
-        } else if self.function_type == 0x20 {
-            0x00
-        } else {
-            self.function_bits
         }
     }
 
     pub fn im4(&self) -> u8 {
-        if self.reps() == 0x34 && self.function_type != 0x20 {
+        if self.reps() == 0x34 && self.function_type != ImFunctionType::F9to12 {
             return self.function_bits;
         }
         0x00
@@ -1790,14 +1869,14 @@ impl ImArg {
 pub struct WrSlDataTime(FastClock, TrkArg, IdArg);
 
 impl WrSlDataTime {
-    pub fn new(fast_clock: &FastClock, trk_arg: &TrkArg, id_arg: &IdArg) -> Self {
-        WrSlDataTime(*fast_clock, *trk_arg, *id_arg)
+    pub fn new(fast_clock: FastClock, trk_arg: TrkArg, id_arg: IdArg) -> Self {
+        WrSlDataTime(fast_clock, trk_arg, id_arg)
     }
 
     pub fn parse(
         clk_rate: u8,
-        frac_minsh: u8,
         frac_minsl: u8,
+        frac_minsh: u8,
         mins: u8,
         trk: u8,
         hours: u8,
@@ -1832,8 +1911,8 @@ impl WrSlDataTime {
 pub struct WrSlDataPt(Pcmd, AddressArg, TrkArg, CvDataArg);
 
 impl WrSlDataPt {
-    pub fn new(pcmd: &Pcmd, opsa: &AddressArg, trk_arg: &TrkArg, cv_data_arg: &CvDataArg) -> Self {
-        WrSlDataPt(*pcmd, *opsa, *trk_arg, *cv_data_arg)
+    pub fn new(pcmd: Pcmd, opsa: AddressArg, trk_arg: TrkArg, cv_data_arg: CvDataArg) -> Self {
+        WrSlDataPt(pcmd, opsa, trk_arg, cv_data_arg)
     }
 
     pub fn parse(
@@ -1888,25 +1967,26 @@ pub struct WrSlDataGeneral(
 
 impl WrSlDataGeneral {
     pub fn new(
-        slot_arg: &SlotArg,
-        stat1_arg: &Stat1Arg,
-        stat2_arg: &Stat2Arg,
-        address_arg: &AddressArg,
-        speed_arg: &SpeedArg,
-        dirf_arg: &DirfArg,
-        trk_arg: &TrkArg,
-        id_arg: &IdArg,
+        slot_arg: SlotArg,
+        stat1_arg: Stat1Arg,
+        stat2_arg: Stat2Arg,
+        address_arg: AddressArg,
+        speed_arg: SpeedArg,
+        dirf_arg: DirfArg,
+        trk_arg: TrkArg,
+        snd_arg: SndArg,
+        id_arg: IdArg,
     ) -> Self {
         WrSlDataGeneral(
-            *slot_arg,
-            *stat1_arg,
-            *stat2_arg,
-            *address_arg,
-            *speed_arg,
-            *dirf_arg,
-            *trk_arg,
-            SndArg(0),
-            *id_arg,
+            slot_arg,
+            stat1_arg,
+            stat2_arg,
+            address_arg,
+            speed_arg,
+            dirf_arg,
+            trk_arg,
+            snd_arg,
+            id_arg,
         )
     }
 
@@ -1978,29 +2058,16 @@ impl WrSlDataGeneral {
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub struct WrSlDataStructure {
-    slot_type: u8,
-    time_slot: WrSlDataTime,
-    pt_slot: WrSlDataPt,
-    general_slot: WrSlDataGeneral,
+pub enum WrSlDataStructure {
+    DataTime(WrSlDataTime),
+    /// Used for train programming
+    DataPt(WrSlDataPt),
+    DataGeneral(WrSlDataGeneral),
 }
 
 impl WrSlDataStructure {
-    pub fn new(
-        slot_type: u8,
-        time_slot: &WrSlDataTime,
-        pt_slot: &WrSlDataPt,
-        general_slot: &WrSlDataGeneral,
-    ) -> Self {
-        WrSlDataStructure {
-            slot_type,
-            time_slot: *time_slot,
-            pt_slot: *pt_slot,
-            general_slot: *general_slot,
-        }
-    }
 
-    pub fn parse(
+    pub(crate) fn parse(
         arg1: u8,
         arg2: u8,
         arg3: u8,
@@ -2013,95 +2080,84 @@ impl WrSlDataStructure {
         arg10: u8,
         arg11: u8,
     ) -> Self {
-        let slot_type = if arg1 == 0x7C {
-            0x7C
+        if arg1 == 0x7C {
+            WrSlDataStructure::DataPt(
+                WrSlDataPt::parse(arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11)
+            )
         } else if arg1 == 0x7B {
-            0x7B
+            WrSlDataStructure::DataTime(
+                WrSlDataTime::parse(arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11)
+            )
         } else {
-            0x00
-        };
-
-        let time_slot =
-            WrSlDataTime::parse(arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11);
-        let pt_slot =
-            WrSlDataPt::parse(arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11);
-        let general_slot = WrSlDataGeneral::parse(
-            arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11,
-        );
-
-        WrSlDataStructure {
-            slot_type,
-            time_slot,
-            pt_slot,
-            general_slot,
+            WrSlDataStructure::DataGeneral(
+                WrSlDataGeneral::parse(
+                    arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11,
+                )
+            )
         }
     }
 
     pub fn slot_type(&self) -> u8 {
-        self.slot_type
+        match self {
+            WrSlDataStructure::DataPt(..) => 0x7C,
+            WrSlDataStructure::DataTime(..) => 0x7B,
+            WrSlDataStructure::DataGeneral(data) => data.slot_arg().slot()
+        }
     }
 
-    pub fn time_slot(&self) -> WrSlDataTime {
-        self.time_slot
-    }
-
-    pub fn pt_slot(&self) -> WrSlDataPt {
-        self.pt_slot
-    }
-
-    pub fn general_slot(&self) -> WrSlDataGeneral {
-        self.general_slot
-    }
-
-    pub fn to_message(&self) -> Vec<u8> {
-        if self.slot_type == 0x7C {
-            vec![
-                0xEF,
-                0x0E,
-                0x7C,
-                self.pt_slot.0.pcmd(),
-                0x00,
-                self.pt_slot.1.adr2(),
-                self.pt_slot.1.adr1(),
-                self.pt_slot.2.trk_arg(),
-                self.pt_slot.3.cvh(),
-                self.pt_slot.3.cvl(),
-                self.pt_slot.3.data7(),
-                0x00,
-                0x00,
-            ]
-        } else if self.slot_type == 0x7B {
-            vec![
-                0xEF,
-                0x0E,
-                0x7B,
-                self.time_slot.0.clk_rate(),
-                self.time_slot.0.frac_minsl(),
-                self.time_slot.0.frac_minsh(),
-                self.time_slot.0.mins(),
-                self.time_slot.1.trk_arg(),
-                self.time_slot.0.hours(),
-                self.time_slot.0.days(),
-                self.time_slot.0.clk_cntrl(),
-                self.time_slot.2.id1(),
-                self.time_slot.2.id2(),
-            ]
-        } else {
-            vec![
-                0xEF,
-                0x0E,
-                self.general_slot.0.slot(),
-                self.general_slot.1.stat1(),
-                self.general_slot.3.adr1(),
-                self.general_slot.4.spd(),
-                self.general_slot.5.dirf(),
-                self.general_slot.6.trk_arg(),
-                self.general_slot.2.stat2(),
-                self.general_slot.3.adr2(),
-                self.general_slot.7.snd(),
-                self.general_slot.8.id1(),
-                self.general_slot.8.id2(),
-            ]
+    pub(crate) fn to_message(self) -> Vec<u8> {
+        match self {
+            WrSlDataStructure::DataPt(pt_slot) => {
+                vec![
+                    0xEF,
+                    0x0E,
+                    0x7C,
+                    pt_slot.0.pcmd(),
+                    0x00,
+                    pt_slot.1.adr2(),
+                    pt_slot.1.adr1(),
+                    pt_slot.2.trk_arg(),
+                    pt_slot.3.cvh(),
+                    pt_slot.3.cvl(),
+                    pt_slot.3.data7(),
+                    0x00,
+                    0x00,
+                ]
+            },
+            WrSlDataStructure::DataTime(time_slot) => {
+                vec![
+                    0xEF,
+                    0x0E,
+                    0x7B,
+                    time_slot.0.clk_rate(),
+                    time_slot.0.frac_minsl(),
+                    time_slot.0.frac_minsh(),
+                    time_slot.0.mins(),
+                    time_slot.1.trk_arg(),
+                    time_slot.0.hours(),
+                    time_slot.0.days(),
+                    time_slot.0.clk_cntrl(),
+                    time_slot.2.id1(),
+                    time_slot.2.id2(),
+                ]
+            },
+            WrSlDataStructure::DataGeneral(general_slot) => {
+                vec![
+                    0xEF,
+                    0x0E,
+                    general_slot.0.slot(),
+                    general_slot.1.stat1(),
+                    general_slot.3.adr1(),
+                    general_slot.4.spd(),
+                    general_slot.5.dirf(),
+                    general_slot.6.trk_arg(),
+                    general_slot.2.stat2(),
+                    general_slot.3.adr2(),
+                    general_slot.7.snd(),
+                    general_slot.8.id1(),
+                    general_slot.8.id2(),
+                ]
+            }
         }
     }
 }
@@ -2112,17 +2168,15 @@ pub struct LissyIrReport {
     dir: bool,
     unit: u16,
     address: u16,
-    arg6: u8,
 }
 
 impl LissyIrReport {
-    pub fn new(dir: bool, unit: u16, address: u16, arg6: u8) -> Self {
+    pub fn new(dir: bool, unit: u16, address: u16) -> Self {
         LissyIrReport {
             arg1: 0x00,
             dir,
             unit,
             address,
-            arg6,
         }
     }
 
@@ -2132,7 +2186,6 @@ impl LissyIrReport {
         low_unit: u8,
         high_adr: u8,
         low_adr: u8,
-        arg6: u8,
     ) -> Self {
 
         let dir = high_unit & 0x40 == 0x40;
@@ -2144,7 +2197,6 @@ impl LissyIrReport {
             dir,
             unit,
             address,
-            arg6,
         }
     }
 
@@ -2157,16 +2209,12 @@ impl LissyIrReport {
         let high_adr = ((self.address >> 7) as u8) & 0x7F;
         let low_adr = self.address as u8 & 0x7F;
         vec![
-            0xE4, 0x08, self.arg1, high_unit, low_unit, high_adr, low_adr, self.arg6,
+            0xE4, 0x08, self.arg1, high_unit, low_unit, high_adr, low_adr,
         ]
     }
 
     pub fn arg1(&self) -> u8 {
         self.arg1
-    }
-
-    pub fn arg6(&self) -> u8 {
-        self.arg6
     }
 
     pub fn dir(&self) -> bool {
@@ -2426,17 +2474,15 @@ pub struct WheelcntReport {
     unit: u16,
     direction: bool,
     count: u16,
-    arg6: u8,
 }
 
 impl WheelcntReport {
-    pub fn new(unit: u16, direction: bool, count: u16, arg6: u8) -> Self {
+    pub fn new(unit: u16, direction: bool, count: u16) -> Self {
         WheelcntReport {
             arg1: 0x40,
             unit,
             direction,
             count,
-            arg6,
         }
     }
 
@@ -2446,7 +2492,6 @@ impl WheelcntReport {
         low_unit: u8,
         high_count: u8,
         low_count: u8,
-        arg6: u8,
     ) -> Self {
         let count = ((high_count as u16) << 7) | (low_count as u16);
         let direction = high_unit & 0x40 == 0x40;
@@ -2456,7 +2501,6 @@ impl WheelcntReport {
             unit,
             direction,
             count,
-            arg6,
         }
     }
 
@@ -2469,16 +2513,12 @@ impl WheelcntReport {
         let high_count = ((self.count >> 7) as u8) & 0x7F;
         let low_count = self.count as u8 & 0x7F;
         vec![
-            0xE4, 0x08, self.arg1, high_unit, low_unit, high_count, low_count, self.arg6,
+            0xE4, 0x08, self.arg1, high_unit, low_unit, high_count, low_count,
         ]
     }
 
     pub fn arg1(&self) -> u8 {
         self.arg1
-    }
-
-    pub fn arg6(&self) -> u8 {
-        self.arg6
     }
 
     pub fn unit(&self) -> u16 {
@@ -2522,11 +2562,11 @@ impl RepStructure {
     pub fn parse(count: u8, args: &[u8]) -> Result<Self, MessageParseError> {
         if args[0] == 0x00 {
             Ok(Self::LissyIrReport(LissyIrReport::parse(
-                args[0], args[1], args[2], args[3], args[4], args[5],
+                args[0], args[1], args[2], args[3], args[4],
             )))
         } else if args[0] == 0x40 {
             Ok(Self::WheelcntReport(WheelcntReport::parse(
-                args[0], args[1], args[2], args[3], args[4], args[5],
+                args[0], args[1], args[2], args[3], args[4],
             )))
         } else if args[0] == 0x41 && count == 0x0C {
             Ok(Self::RFID5Report(RFID5Report::parse(
@@ -2613,14 +2653,14 @@ impl PxctData {
 
         PxctData {
             pxc,
-            d1: d1 | ((pxct1 & 0x01) << 7),
-            d2: d2 | ((pxct1 & 0x02) << 6),
-            d3: d3 | ((pxct1 & 0x04) << 5),
-            d4: d4 | ((pxct1 & 0x08) << 4),
-            d5: d5 | ((pxct2 & 0x01) << 7),
-            d6: d6 | ((pxct2 & 0x02) << 6),
-            d7: d7 | ((pxct2 & 0x04) << 5),
-            d8: d8 | ((pxct2 & 0x08) << 4),
+            d1: d1 | ((pxct1 & 0x01) << 6),
+            d2: d2 | ((pxct1 & 0x02) << 5),
+            d3: d3 | ((pxct1 & 0x04) << 4),
+            d4: d4 | ((pxct1 & 0x08) << 3),
+            d5: d5 | ((pxct2 & 0x01) << 6),
+            d6: d6 | ((pxct2 & 0x02) << 5),
+            d7: d7 | ((pxct2 & 0x04) << 4),
+            d8: d8 | ((pxct2 & 0x08) << 3),
         }
     }
 
@@ -2629,7 +2669,7 @@ impl PxctData {
     }
 
     pub fn pxct1(&self) -> u8 {
-        let mut pxct1 = self.pxc & 0x07 << 4;
+        let mut pxct1 = (self.pxc & 0x07) << 4;
 
         if self.d1 & 0x40 == 0x40 {
             pxct1 |= 0x01;
@@ -2648,22 +2688,22 @@ impl PxctData {
     }
 
     pub fn pxct2(&self) -> u8 {
-        let mut pxct1 = self.pxc & 0x78 << 1;
+        let mut pxct2 = (self.pxc & 0x78) << 1;
 
         if self.d5 & 0x40 == 0x40 {
-            pxct1 |= 0x01;
+            pxct2 |= 0x01;
         }
         if self.d6 & 0x40 == 0x40 {
-            pxct1 |= 0x02;
+            pxct2 |= 0x02;
         }
         if self.d7 & 0x40 == 0x40 {
-            pxct1 |= 0x04;
+            pxct2 |= 0x04;
         }
         if self.d8 & 0x40 == 0x40 {
-            pxct1 |= 0x08;
+            pxct2 |= 0x08;
         }
 
-        pxct1
+        pxct2
     }
 
     pub fn d1(&self) -> u8 {
@@ -2723,49 +2763,57 @@ pub struct ProgrammingAbortedArg {
 }
 
 impl ProgrammingAbortedArg {
+    pub fn new(len: u8, args: &[u8]) -> Self {
+        ProgrammingAbortedArg::parse(len, args)
+    }
+
     pub(crate) fn parse(len: u8, args: &[u8]) -> Self {
         match len {
-            0x10 => ProgrammingAbortedArg {
-                arg_len: len,
-                arg1: args[0],
-                arg2: args[1],
-                arg3: args[2],
-                arg4: args[3],
-                arg5: args[4],
-                arg6: args[5],
-                arg7: args[6],
-                arg8: args[7],
-                arg9: args[8],
-                arg10: args[9],
-                arg11: args[10],
-                arg12: 0,
-                arg13: 0,
-                arg14: 0,
-                arg15: 0,
-                arg16: 0,
-                arg17: 0,
-                arg18: 0,
+            0x10 => {
+                ProgrammingAbortedArg {
+                    arg_len: len,
+                    arg1: args[0],
+                    arg2: args[1],
+                    arg3: args[2],
+                    arg4: args[3],
+                    arg5: args[4],
+                    arg6: args[5],
+                    arg7: args[6],
+                    arg8: args[7],
+                    arg9: args[8],
+                    arg10: args[9],
+                    arg11: args[10],
+                    arg12: args[11],
+                    arg13: args[12],
+                    arg14: 0,
+                    arg15: 0,
+                    arg16: 0,
+                    arg17: 0,
+                    arg18: 0,
+                }
             },
-            len => ProgrammingAbortedArg {
-                arg_len: len,
-                arg1: args[0],
-                arg2: args[1],
-                arg3: args[2],
-                arg4: args[3],
-                arg5: args[4],
-                arg6: args[5],
-                arg7: args[6],
-                arg8: args[7],
-                arg9: args[8],
-                arg10: args[9],
-                arg11: args[10],
-                arg12: args[11],
-                arg13: args[12],
-                arg14: args[13],
-                arg15: args[14],
-                arg16: args[15],
-                arg17: args[16],
-                arg18: args[17],
+            len => {
+                ProgrammingAbortedArg {
+                    arg_len: len,
+                    arg1: args[0],
+                    arg2: args[1],
+                    arg3: args[2],
+                    arg4: args[3],
+                    arg5: args[4],
+                    arg6: args[5],
+                    arg7: args[6],
+                    arg8: args[7],
+                    arg9: args[8],
+                    arg10: args[9],
+                    arg11: args[10],
+                    arg12: args[11],
+                    arg13: args[12],
+                    arg14: args[13],
+                    arg15: args[14],
+                    arg16: args[15],
+                    arg17: args[16],
+                    arg18: args[17],
+                }
             }
         }
     }
@@ -2782,11 +2830,12 @@ impl ProgrammingAbortedArg {
                 self.arg5,
                 self.arg6,
                 self.arg7,
+                self.arg8,
                 self.arg9,
                 self.arg10,
                 self.arg11,
                 self.arg12,
-                self.arg13,
+                self.arg13
             ],
             _ => vec![
                 0xE6,
@@ -2798,6 +2847,7 @@ impl ProgrammingAbortedArg {
                 self.arg5,
                 self.arg6,
                 self.arg7,
+                self.arg8,
                 self.arg9,
                 self.arg10,
                 self.arg11,
@@ -2807,7 +2857,7 @@ impl ProgrammingAbortedArg {
                 self.arg15,
                 self.arg16,
                 self.arg17,
-                self.arg18,
+                self.arg18
             ],
         }
     }

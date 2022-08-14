@@ -1,13 +1,18 @@
 [package]
 name = "locodrive"
 version = "0.1.0"
-authors = ["Fabius Mettner <fabius1705@live.de>, Niklas Elsbrock <mail@nelsbrock.de>"]
 edition = "2018"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+authors = ["Fabius Mettner <fabius1705@live.de>", "Niklas Elsbrock <mail@nelsbrock.de>"]
+license = "MIT"
+readme = "README.md"
+repository = "https://github.com/juhu1705/locodrive-rust"
+description = """
+A `LocoNet` connection handler to read message from and write messages to serial port based LocoNets.
+"""
+categories = ["loco net", "model train"]
 
 [dependencies]
 tokio-serial = "5.4.1"
 tokio-util = { version = "0.7.3", features = ["codec"] }
 bytes = "1.2.1"
-tokio = { version = "1", features = ["full"] }
+tokio = { version = "1", features = ["rt", "rt-multi-thread", "io-util", "macros", "sync"] }

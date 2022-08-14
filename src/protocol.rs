@@ -174,7 +174,12 @@ pub enum Message {
     /// Indicates that the programming service mode is aborted.
     ProgrammingAborted(ProgrammingAbortedArg),
 
-    /// Moves 8 bytes peer to peer from the source slot to the destination
+    /// Moves 8 bytes peer to peer from the source slot to the destination.
+    ///
+    /// Slot = 0: Slot is master
+    /// Slot = 0x70 - 0x7E: reserved
+    /// Slot = 0x7F: Throttle message xfer
+    ///
     PeerXfer(SlotArg, DstArg, PxctData),
 
     /// This message holds reports
@@ -402,7 +407,9 @@ impl Message {
                 SndArg::parse(args[9]),
                 IdArg::parse(args[10], args[11]),
             )),
-            0xE6 => Ok(Message::ProgrammingAborted(ProgrammingAbortedArg::parse(args[0], &args[1..args.len()]))),
+            0xE6 => {
+                Ok(Message::ProgrammingAborted(ProgrammingAbortedArg::parse(args[0], &args[1..])))
+            },
             0xE4 => Ok(Self::Rep(
                 match RepStructure::parse(args[0], &args[1..]) {
                     Err(err) => return Err(err),
@@ -452,10 +459,10 @@ impl Message {
             Message::LocoSpd(slot, spd) => vec![0xA0_u8, slot.slot(), spd.spd()],
             Message::MultiSense(multi_sense, address) => vec![
                 0xD0_u8,
-                multi_sense.m_type(),
+                multi_sense.m_high(),
                 multi_sense.zas(),
-                address.adr1(),
                 address.adr2(),
+                address.adr1(),
             ],
             Message::UhliFun(slot, function) => vec![
                 0xD4_u8,
