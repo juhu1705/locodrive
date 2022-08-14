@@ -190,58 +190,86 @@ impl SwitchArg {
     }
 }
 
+/// Represents one slots address between 0 to 127.
+///
+/// Note that some slots are special handled slots and therefore can not be used (read/write) as normal slots
 ///
 /// # Slots
 ///
 /// | Nr.     | Function                           |
 /// |---------|------------------------------------|
 /// | 0       | dispatch                           |
-/// | 1-119   | active locs                        |
+/// | 1-119   | active locs (normal slots)         |
 /// | 120-127 | reserved (system / master control) |
 /// | - 123   | fast clock                         |
 /// | - 124   | programming track                  |
 /// | - 127   | command station options            |
-#[derive(Debug, Copy, Clone, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct SlotArg(u8);
 
 impl SlotArg {
-    pub fn new(slot: u16) -> Self {
-        Self((slot as u8) & 0x7F)
-    }
-
-    pub fn parse(slot: u8) -> Self {
+    /// Creates a new slots address in range of 0 to 127.
+    ///
+    /// Please consider that the special slots (0, 120 - 127) may not work
+    /// as you expect other slots to do.
+    ///
+    /// # Parameter
+    ///
+    /// - `slot`: The slots address to set
+    pub fn new(slot: u8) -> Self {
         Self(slot & 0x7F)
     }
 
+    /// Parses an incoming slot message from a `LocoNet` message.
+    ///
+    /// # Parameter
+    ///
+    /// - `slot`: The slots address to set
+    pub(crate) fn parse(slot: u8) -> Self {
+        Self(slot & 0x7F)
+    }
+
+    /// # Returns
+    ///
+    /// The slot hold by the struct
     pub fn slot(&self) -> u8 {
         self.0
     }
-
-    pub fn set_slot(&mut self, slot: u8) {
-        debug_assert_eq!(
-            slot & 0x7F,
-            0,
-            "number must only use the 7 least significant bits"
-        );
-        self.0 = slot;
-    }
 }
 
-impl PartialEq for SlotArg {
-    fn eq(&self, other: &Self) -> bool {
-        self.0 == other.0
-    }
-}
-
-#[derive(Copy, Clone, Eq, PartialEq)]
+/// Represents the speed set to a [`SlotArg`].
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum SpeedArg {
+    /// Performs a normal stop. Trains may stop smoothly when they receive a message force them to stop.
     Stop,
+    /// Performs an immediate stop action. Trains do stop immediately.
     EmergencyStop,
+    /// Sets the slots speed to a given value. If you want a slot speed to set to 0
+    /// use [`SpeedArg::Stop`] or create your [`SpeedArg`] using [`SpeedArg::new()`]
     Drive(u8),
 }
 
 impl SpeedArg {
-    pub fn parse(spd: u8) -> Self {
+    /// Creates a new [`SpeedArg`] from the given value.
+    /// This means returning [`SpeedArg::Stop`] if the given `spd` is set to 0 and
+    /// returning [`SpeedArg::Drive`] with the given `spd` set as speed otherwise.
+    ///
+    /// # Parameters
+    ///
+    /// - `spd`: The speed to create the `SpeedArg` for
+    pub fn new(spd: u8) -> Self {
+        match spd {
+            0x00 => Self::Stop,
+            _ => Self::Drive(spd as u8),
+        }
+    }
+
+    /// Parses the speed from a `LocoNet` send speed
+    ///
+    /// # Parameters
+    ///
+    /// - `spd`: The `LocoNet` messages speed.
+    pub(crate) fn parse(spd: u8) -> Self {
         match spd {
             0x00 => Self::Stop,
             0x01 => Self::EmergencyStop,
@@ -249,18 +277,10 @@ impl SpeedArg {
         }
     }
 
-    pub fn new(spd: u16) -> Self {
-        match spd {
-            0x00 => Self::Stop,
-            _ => Self::Drive(spd as u8),
-        }
-    }
-
-    pub fn new_emergency() -> Self {
-        Self::EmergencyStop
-    }
-
-    pub fn spd(&self) -> u8 {
+    /// # Returns
+    ///
+    /// The `LocoNet` interpreted speed of this arg
+    pub(crate) fn spd(&self) -> u8 {
         match *self {
             SpeedArg::Stop => 0x00,
             SpeedArg::EmergencyStop => 0x01,
@@ -268,25 +288,18 @@ impl SpeedArg {
         }
     }
 
+    /// # Returns
+    ///
+    /// A `u8` interpreted value of the given [`SpeedArg`].
+    ///
+    /// Please note that [`SpeedArg::Stop`] and [`SpeedArg::EmergencyStop`] are both cast to 0
+    /// as they both indicates that the slots speed is 0 and only differ in how
+    /// immediate this state is reached by the connected device.
     pub fn get_spd(&self) -> u8 {
         match *self {
             SpeedArg::Stop => 0x00,
             SpeedArg::EmergencyStop => 0x00,
             SpeedArg::Drive(spd) => spd,
-        }
-    }
-
-    pub fn is_emergency_stop(&self) -> bool {
-        matches!(self, SpeedArg::EmergencyStop)
-    }
-}
-
-impl Debug for SpeedArg {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            SpeedArg::Stop => write!(f, "speed: stop"),
-            SpeedArg::EmergencyStop => write!(f, "speed: emergency stop"),
-            SpeedArg::Drive(spd) => write!(f, "speed: {}", spd),
         }
     }
 }
