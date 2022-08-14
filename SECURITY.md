@@ -4,11 +4,11 @@
 
 | Version | Supported |
 |---------|-----------|
-| 0.1.0   | [x]       |
+| 0.1.x   | [x]       |
 
 ## Reporting a Vulnerability
 
-To report vulnerabilities please email me to fabius1705@live.de or create a draft security advisory.
+To report vulnerabilities please email me to fabius1705@live.de or create security advisory.
 
 Please describe the vulnerability as detailed as you can. And leave a description on how to recreate if possible.
 I will look up the vulnerability when I have time next. It could be that I have further questions, so to ensure that I can understand the issue you can leave me a contact possibility.
