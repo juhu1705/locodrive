@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: LocoNet Discussions
+    url: https://github.com/juhu1705/locodrive-rust/discussions
+    about: Please ask and answer questions about the LocoNet protocol here.
