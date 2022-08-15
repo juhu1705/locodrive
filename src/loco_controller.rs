@@ -107,14 +107,14 @@ impl LocoNetController {
     /// # Parameter
     ///
     /// - `port_name`: Is the name of the port to connect to.
-    ///   If you are not sure, which ports are allowed use [`tokio_serial::available_ports()`].
+    ///   If you are not sure, which ports are allowed use [`tokio_serial::available_ports()`](https://docs.rs/tokio-serial/latest/tokio_serial/fn.available_ports.html).
     /// - `baud_rate`: The baud rate to use for the port connection.
     /// - `sending_timeout`: How long to wait for response for the loco net connection
     ///   while sending messages.
     /// - `update_cycles`: How long to wait for incoming messages on reader side,
     ///   before checking if this reader should close.
     /// - `flow_control`: Which mode of flow control to use for this port.
-    ///   It is recommended to use [`FlowControl::Software`].
+    ///   It is recommended to use [`FlowControl::Software`](https://docs.rs/tokio-serial/latest/tokio_serial/enum.FlowControl.html).
     ///
     /// # Error
     ///

@@ -287,7 +287,7 @@ impl SpeedArg {
         match *self {
             SpeedArg::Stop => 0x00,
             SpeedArg::EmergencyStop => 0x01,
-            SpeedArg::Drive(spd) => spd + 1 & 0x7F,
+            SpeedArg::Drive(spd) => (spd + 1) & 0x7F,
         }
     }
 
@@ -487,7 +487,7 @@ impl TrkArg {
 
     /// # Returns
     ///
-    /// The tracks master idle status
+    /// The tracks master idle status.
     pub fn track_idle(&self) -> bool {
         self.idle
     }
@@ -504,16 +504,16 @@ impl TrkArg {
 
     /// # Returns
     ///
-    /// The programing tracks busy status
+    /// The programing tracks busy status.
     pub fn prog_busy(&self) -> bool {
         self.prog_busy
     }
 
-    /// Parses this arg to a valid `LocoNet` track message byte
+    /// Parses this arg to a valid `LocoNet` track message byte.
     ///
     /// # Returns
     ///
-    /// The `LocoNet` trk message byte matching this [`TrkArg`]
+    /// The `LocoNet` trk message byte matching this [`TrkArg`].
     pub(crate) fn trk_arg(&self) -> u8 {
         let mut trk_arg = if self.power { 0x01 } else { 0x00 };
         if !self.idle {
@@ -529,13 +529,21 @@ impl TrkArg {
     }
 }
 
+/// Holds the function flags 5 to 8.
+///
+/// This function flags may be used for train sound management if available.
 #[derive(Copy, Clone, Eq, PartialEq)]
 pub struct SndArg(u8);
 
 impl SndArg {
-    pub fn parse(snd: u8) -> Self {
-        Self(snd & 0x0F)
-    }
+    /// Creates a new [`SndArg`] with the function flags set.
+    ///
+    /// # Parameters
+    ///
+    /// - `f5`: Function flag 5
+    /// - `f6`: Function flag 6
+    /// - `f7`: Function flag 7
+    /// - `f8`: Function flag 8
     pub fn new(f5: bool, f6: bool, f7: bool, f8: bool) -> Self {
         let mut snd = if f5 { 0x01 } else { 0x00 } as u8;
         if f6 {
@@ -550,33 +558,56 @@ impl SndArg {
         Self(snd)
     }
 
-    pub fn f(&self, f_num: u8) -> bool {
-        assert!(
-            (5..=8).contains(&f_num),
-            "f_num must be within 5 and 8 (inclusive)"
-        );
-        self.0 & 1 << (f_num - 5) != 0
+    /// Parses a `LocoNet` based function message byte to this arg.
+    ///
+    /// # Parameters
+    ///
+    /// - `snd`: A `LocoNet` formatted snd byte
+    pub(crate) fn parse(snd: u8) -> Self {
+        Self(snd & 0x0F)
     }
 
-    pub fn set_f(&mut self, f_num: u8, value: bool) {
-        assert!(
-            (5..=8).contains(&f_num),
-            "f_num must be within 5 and 8 (inclusive)"
-        );
-        let mask = 1 << (f_num - 5);
-        if value {
-            self.0 |= mask;
+    /// # Parameters
+    ///
+    /// - `f_num`: Which flag to look up
+    ///
+    /// # Returns
+    ///
+    /// The value of the `f_num`s function flag. Only values between 5 and 8 are allowed.
+    pub fn f(&self, f_num: u8) -> bool {
+        if (5..=8).contains(&f_num) {
+            self.0 & 1 << (f_num - 5) != 0
         } else {
-            self.0 &= !mask;
+            false
         }
     }
 
-    pub fn snd(&self) -> u8 {
+    /// Sets the value of the `f_num`s function flag to `value`.
+    ///
+    /// # Parameters
+    ///
+    /// - `f_num`: The function flags index
+    /// - `value`: Which value to set the function bit to
+    pub fn set_f(&mut self, f_num: u8, value: bool) {
+        if (5..=8).contains(&f_num) {
+            let mask = 1 << (f_num - 5);
+            if value {
+                self.0 |= mask;
+            } else {
+                self.0 &= !mask;
+            }
+        }
+    }
+
+    /// Parses this [`SndArg`] to a `LocoNet` snd message byte
+    pub(crate) fn snd(&self) -> u8 {
         self.0
     }
 }
 
+/// Overrides the [`Debug`] trait to show only the corresponding function bits
 impl Debug for SndArg {
+    /// Prints the f flags from 5 to 8 to the formatter
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -589,6 +620,7 @@ impl Debug for SndArg {
     }
 }
 
+/// Represents the link status of a slot
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum Consist {
     /// Slot is linked up and down
@@ -601,44 +633,76 @@ pub enum Consist {
     Free,
 }
 
+/// Represents the usage status of a slot
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum State {
+    /// Indicates that this slot is in use by some device. The slot holds a loc address and is refreshed.
+    ///
+    /// If you want to mark your slot as [`State::InUse`] simply perform a `NULL`-Move on this slot. (Move message with equal source and destination)
     InUse,
+    /// A loco adr is in the slot but the slot was not refreshed.
     Idle,
+    /// This slot holds some loc address and is refreshed.
     Common,
+    /// No valid data in this slot, this slot is not refreshed.
     Free,
 }
 
+/// Represents the decoders speed control message format used
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum DecoderType {
+    /// 28 step decoder with advanced DCC allowed
     Dcc28,
+    /// 128 step decoder with advanced DVV allowed
     Dcc128,
+    /// 28 step mode in 3 byte PKT regular mode
     Regular28,
+    /// 28 step mode. Generates trinary packets for mobile address.
     AdrMobile28,
+    /// 14 step speed mode (Speed will match values from 0 to 14)
     Step14,
+    /// 128 speed mode packets
     Speed128,
 }
 
+/// Holds general slot status information.
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct Stat1Arg {
-    spurge: bool,
+    /// The slots purge status.
+    s_purge: bool,
+    /// The slots link status.
     consist: Consist,
+    /// The slots usage status.
     state: State,
+    /// The decoder type used by the slot.
     decoder_type: DecoderType,
 }
 
 impl Stat1Arg {
-    pub fn new(spurge: bool, consist: Consist, state: State, decoder_type: DecoderType) -> Self {
+    /// Creates new slot status information
+    ///
+    /// # Parameters
+    ///
+    /// - `s_purge`: The slots purge status
+    /// - `consist`: The slots link status
+    /// - `state`: The slots usage status
+    /// - `decoder_type`: The decoder type used to generate loc messages for this slot
+    pub fn new(s_purge: bool, consist: Consist, state: State, decoder_type: DecoderType) -> Self {
         Stat1Arg {
-            spurge,
+            s_purge,
             consist,
             state,
             decoder_type,
         }
     }
 
-    pub fn parse(stat1: u8) -> Self {
-        let spurge = stat1 & 0x80 != 0;
+    /// Parses a `LocoNet` formatted `stat1` byte into this arg
+    ///
+    /// # Parameters
+    ///
+    /// - `stat1`: The status byte to parse
+    pub(crate) fn parse(stat1: u8) -> Self {
+        let s_purge = stat1 & 0x80 != 0;
 
         let consist = match stat1 & 0x48 {
             0x48 => Consist::LogicalMid,
@@ -667,31 +731,44 @@ impl Stat1Arg {
         };
 
         Stat1Arg {
-            spurge,
+            s_purge,
             consist,
             state,
             decoder_type,
         }
     }
 
-    pub fn spurge(&self) -> bool {
-        self.spurge
+    /// # Returns
+    ///
+    /// The slots purge status
+    pub fn s_purge(&self) -> bool {
+        self.s_purge
     }
 
+    /// # Returns
+    ///
+    /// The slots linking state
     pub fn consist(&self) -> Consist {
         self.consist
     }
 
+    /// # Returns
+    ///
+    /// The usage state of the slot
     pub fn state(&self) -> State {
         self.state
     }
 
+    /// # Returns
+    ///
+    /// The decoder type to use for this slot
     pub fn decoder_type(&self) -> DecoderType {
         self.decoder_type
     }
 
-    pub fn stat1(&self) -> u8 {
-        let mut stat1: u8 = if self.spurge { 0x80 } else { 0x00 };
+    /// Parses this arg to a `LocoNet` defined stat1 message byte
+    pub(crate) fn stat1(&self) -> u8 {
+        let mut stat1: u8 = if self.s_purge { 0x80 } else { 0x00 };
 
         stat1 |= match self.consist {
             Consist::LogicalMid => 0x48,
