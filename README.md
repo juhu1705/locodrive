@@ -1,4 +1,4 @@
-# LocoDrive [![Tests](https://github.com/juhu1705/locodrive-rust/actions/workflows/rust.yml/badge.svg?branch=main)](https://github.com/juhu1705/locodrive-rust/actions/workflows/rust.yml)[![Docs](https://github.com/juhu1705/locodrive-rust/actions/workflows/doc.yml/badge.svg?branch=main)](https://github.com/juhu1705/locodrive-rust/actions/workflows/doc.yml)
+# LocoDrive [![Tests](https://github.com/juhu1705/locodrive/actions/workflows/rust.yml/badge.svg?branch=main)](https://github.com/juhu1705/locodrive/actions/workflows/rust.yml)[![Docs](https://github.com/juhu1705/locodrive/actions/workflows/doc.yml/badge.svg?branch=main)](https://github.com/juhu1705/locodrive/actions/workflows/doc.yml)
 
 A rust library for controlling a model train railroad based on the `LocoNet` system.
 
@@ -12,7 +12,7 @@ A rust library for controlling a model train railroad based on the `LocoNet` sys
 ## Importing the LocoDrive
 
 As rust is able to use GitHub repositories directly as dependencies you can simply add 
-`locodrive = { git = "https://github.com/juhu1705/locodrive-rust.git" }` to your `Cargo.toml`
+`locodrive = { git = "https://github.com/juhu1705/locodrive.git" }` to your `Cargo.toml`
 
 ## Using the LocoDrive
 
@@ -21,7 +21,7 @@ This reader will care of parsing received messages correctly before sending them
 
 ## Documentation
 
-The documentation is published [here](https://juhu1705.github.io/locodrive-rust)
+The documentation is published [here](https://juhu1705.github.io/locodrive)
 
 ## Committing to the LocoDrive
 

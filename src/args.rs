@@ -94,7 +94,7 @@ impl SwitchArg {
         }
     }
 
-    /// Parses the arguments of an incomming loco net message to a [`SwitchArg`]
+    /// Parses the arguments of an incomming loco net message to a [`SwitchArg`].
     ///
     /// # Parameters
     ///
@@ -139,7 +139,7 @@ impl SwitchArg {
         self.state
     }
 
-    /// Sets the address of the switch to use
+    /// Sets the address of the switch to use.
     ///
     /// # Parameters
     ///
@@ -147,7 +147,7 @@ impl SwitchArg {
     pub fn set_address(&mut self, address: u16) {
         self.address = address;
     }
-    /// Sets the direction to switch to
+    /// Sets the direction to switch to.
     ///
     /// # Parameters
     ///
@@ -155,7 +155,7 @@ impl SwitchArg {
     pub fn set_direction(&mut self, direction: SwitchDirection) {
         self.direction = direction;
     }
-    /// Sets the activation state of the switch
+    /// Sets the activation state of the switch.
     ///
     /// # Parameters
     ///
@@ -166,14 +166,14 @@ impl SwitchArg {
 
     /// # Returns
     ///
-    /// The seven least significant address bits
+    /// The seven least significant address bits.
     pub(crate) fn sw1(&self) -> u8 {
         (self.address & 0x007F) as u8
     }
 
     /// # Returns
     ///
-    /// The four most significant address bits combined with a direction state and activation state
+    /// The four most significant address bits combined with a direction state and activation state.
     pub(crate) fn sw2(&self) -> u8 {
         let mut sw2 = ((self.address >> 7) & 0x000F) as u8;
 
@@ -192,7 +192,7 @@ impl SwitchArg {
 
 /// Represents one slots address between 0 to 127.
 ///
-/// Note that some slots are special handled slots and therefore can not be used (read/write) as normal slots
+/// Note that some slots are special handled slots and therefore can not be used (read/write) as normal slots.
 ///
 /// # Slots
 ///
@@ -245,7 +245,9 @@ pub enum SpeedArg {
     /// Performs an immediate stop action. Trains do stop immediately.
     EmergencyStop,
     /// Sets the slots speed to a given value. If you want a slot speed to set to 0
-    /// use [`SpeedArg::Stop`] or create your [`SpeedArg`] using [`SpeedArg::new()`]
+    /// use [`SpeedArg::Stop`] or create your [`SpeedArg`] using [`SpeedArg::new()`].
+    ///
+    /// The maximum speed is 126. Higher values may create unexpected behaviour.
     Drive(u8),
 }
 
@@ -256,7 +258,8 @@ impl SpeedArg {
     ///
     /// # Parameters
     ///
-    /// - `spd`: The speed to create the `SpeedArg` for
+    /// - `spd`: The speed to create the `SpeedArg` for.
+    ///          The maximum speed is 126. Higher values may create unexpected behaviour.
     pub fn new(spd: u8) -> Self {
         match spd {
             0x00 => Self::Stop,
@@ -264,11 +267,11 @@ impl SpeedArg {
         }
     }
 
-    /// Parses the speed from a `LocoNet` send speed
+    /// Parses the speed from a `LocoNet` send speed.
     ///
     /// # Parameters
     ///
-    /// - `spd`: The `LocoNet` messages speed.
+    /// - `spd`: The `LocoNet` messages speed
     pub(crate) fn parse(spd: u8) -> Self {
         match spd {
             0x00 => Self::Stop,
@@ -279,12 +282,12 @@ impl SpeedArg {
 
     /// # Returns
     ///
-    /// The `LocoNet` interpreted speed of this arg
+    /// The `LocoNet` interpreted speed of this arg.
     pub(crate) fn spd(&self) -> u8 {
         match *self {
             SpeedArg::Stop => 0x00,
             SpeedArg::EmergencyStop => 0x01,
-            SpeedArg::Drive(spd) => spd + 1,
+            SpeedArg::Drive(spd) => spd + 1 & 0x7F,
         }
     }
 
@@ -304,10 +307,23 @@ impl SpeedArg {
     }
 }
 
+/// Represents the direction and first five function bits of a slot.
+///
+/// Function bit 0 may control a trains light
 #[derive(Copy, Clone, Eq, PartialEq)]
 pub struct DirfArg(u8);
 
 impl DirfArg {
+    /// Creates a new dirf arg with all possible functions set
+    ///
+    /// # Parameter
+    ///
+    /// - `dir`: The direction to set (`true` = forwards, `false` = backwards)
+    /// - `f0`: Function bit 0 (train light control)
+    /// - `f1`: Function bit 1
+    /// - `f2`: Function bit 2
+    /// - `f3`: Function bit 3
+    /// - `f4`: Function bit 4
     pub fn new(dir: bool, f0: bool, f1: bool, f2: bool, f3: bool, f4: bool) -> Self {
         let mut dirf = if dir { 0x20 } else { 0x00 };
         if f0 {
@@ -325,22 +341,40 @@ impl DirfArg {
         if f4 {
             dirf |= 0x08
         }
+        Self(dirf)
+    }
+
+    /// Parses the direction from a `LocoNet` message.
+    pub(crate) fn parse(dirf: u8) -> Self {
         Self(dirf & 0x3F)
     }
 
-    pub fn parse(dirf: u8) -> Self {
-        Self(dirf & 0x3F)
-    }
-
+    /// # Returns
+    ///
+    /// The direction represented by this [`DirfArg`].
+    /// `true` means forward, `false` means backwards.
     pub fn dir(&self) -> bool {
         self.0 & 0x20 != 0
     }
 
+    /// # Returns
+    ///
+    /// The value of the requested f-flag.
+    /// As there are only for f-flags are hold by one [`DirfArg`] only values from
+    /// 0 to 4 are calculated other inputs may ever return `false`.
     pub fn f(&self, f_num: u8) -> bool {
-        assert!(f_num <= 4, "f must be lower than or equal to 4");
-        self.0 >> (if f_num == 0 { 4 } else { f_num - 1 }) & 1 != 0
+        if f_num <= 4 {
+            self.0 >> (if f_num == 0 { 4 } else { f_num - 1 }) & 1 != 0
+        } else {
+            false
+        }
     }
 
+    /// Sets the direction hold by this arg to the requested value
+    ///
+    /// # Parameters
+    ///
+    /// - `value`: The direction to set (`true` = forward, `false` = backward)
     pub fn set_dir(&mut self, value: bool) {
         if value {
             self.0 |= 0x20;
@@ -349,22 +383,37 @@ impl DirfArg {
         }
     }
 
+    /// Sets the value of the requested f-flag.
+    ///
+    /// # Parameters
+    ///
+    /// - `f_num`: The f-flag to set. (Only values in range of 0 to 4 may create an effect).
+    ///            Other inputs will be ignored.
+    /// - `value`: The value to set the requested flag to.
     pub fn set_f(&mut self, f_num: u8, value: bool) {
-        assert!(f_num <= 4, "f must be lower than or equal to 4");
-        let mask = 1 << if f_num == 0 { 4 } else { f_num - 1 };
-        if value {
-            self.0 |= mask;
-        } else {
-            self.0 &= !mask;
+        if f_num <= 4 {
+            let mask = 1 << if f_num == 0 { 4 } else { f_num - 1 };
+            if value {
+                self.0 |= mask;
+            } else {
+                self.0 &= !mask;
+            }
         }
     }
 
-    pub fn dirf(&self) -> u8 {
+    /// Parses this [`DirfArg`] in the corresponding `LocoNet` message format.
+    ///
+    /// # Returns
+    ///
+    /// The to this arg corresponding `LocoNet` message value.
+    pub(crate) fn dirf(&self) -> u8 {
         self.0
     }
 }
 
+/// Overriding the [`Debug`] trait, to show only the corresponding arg states
 impl Debug for DirfArg {
+    /// Prints the direction and all f-flags from 0 to 4 to the formatter
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -379,15 +428,29 @@ impl Debug for DirfArg {
     }
 }
 
+/// Holds the track information
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct TrkArg {
+    /// The tracks power state (`ON`/`OFF`).
     power: bool,
+    /// The tracks idle state.
     idle: bool,
+    /// `true`: This master implements `LocoNet 1.1` capability.
+    /// `false`: This master is `DT200`.
     mlok1: bool,
+    /// Indicates that masters programming track is busy.
     prog_busy: bool,
 }
 
 impl TrkArg {
+    /// Creates a new arg representing the tracks status
+    ///
+    /// # Parameters
+    ///
+    /// - `power`: The tracks power state (`On`/`OFF`)
+    /// - `idle`: The tracks idle state
+    /// - `mlok1`: The protocol Version to use. 0 = `DT200`, 1 = `LocoNet 1.1`
+    /// - `prog_busy`: Busy status for programming track (Slot 124)
     pub fn new(power: bool, idle: bool, mlok1: bool, prog_busy: bool) -> Self {
         TrkArg {
             power,
@@ -397,6 +460,11 @@ impl TrkArg {
         }
     }
 
+    /// Parses a `LocoNet` messages trk arg to this struct by extracting the required values.
+    ///
+    /// # Parameters
+    ///
+    /// - `trk_arg`: The track message to parse
     pub fn parse(trk_arg: u8) -> Self {
         let power = trk_arg & 0x01 == 0x01;
         let idle = trk_arg & 0x02 == 0x00;
@@ -410,23 +478,43 @@ impl TrkArg {
         }
     }
 
+    /// # Returns
+    ///
+    /// The power state of the track.
     pub fn power_on(&self) -> bool {
         self.power
     }
 
+    /// # Returns
+    ///
+    /// The tracks master idle status
     pub fn track_idle(&self) -> bool {
         self.idle
     }
 
+    /// # Returns
+    ///
+    /// The available protocol version by the master.
+    ///
+    /// - `true` = `LocoNet 1.1`
+    /// - `false` = `DT200`
     pub fn mlok1(&self) -> bool {
         self.mlok1
     }
 
+    /// # Returns
+    ///
+    /// The programing tracks busy status
     pub fn prog_busy(&self) -> bool {
         self.prog_busy
     }
 
-    pub fn trk_arg(&self) -> u8 {
+    /// Parses this arg to a valid `LocoNet` track message byte
+    ///
+    /// # Returns
+    ///
+    /// The `LocoNet` trk message byte matching this [`TrkArg`]
+    pub(crate) fn trk_arg(&self) -> u8 {
         let mut trk_arg = if self.power { 0x01 } else { 0x00 };
         if !self.idle {
             trk_arg |= 0x02;
