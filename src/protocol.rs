@@ -1,12 +1,12 @@
 use crate::args::*;
 use crate::error::MessageParseError;
 
-/// Represents the types of messages that are specified by the `LocoNet` protocol.
+/// Represents the types of messages that are specified by the model railroads protocol.
 #[repr(u8)]
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum Message {
-    /// Forces the `LocoNet` to switch in Idle state. An emergency stop for all trains is broadcast.
-    /// Note: The `LocoNet` may not response any more.
+    /// Forces the model railroads to switch in Idle state. An emergency stop for all trains is broadcast.
+    /// Note: The model railroads may not response any more.
     Idle,
     /// Turns the global power on. Activates the railway.
     GpOn,
@@ -120,9 +120,9 @@ pub enum Message {
     LongAck(LopcArg, Ack1Arg),
     /// This holds general sensor input from an addressed sensor.
     ///
-    /// On state change this message is automatically send from the sensor over the `LocoNet`,
+    /// On state change this message is automatically send from the sensor over the model railroads,
     /// but if you want to receive all your sensor states you can configure a switch address that
-    /// forces the sensor module to send its state in the `LocoNet` sensor device.
+    /// forces the sensor module to send its state in the model railroads sensor device.
     InputRep(InArg),
     /// Switch sensor report
     ///
@@ -202,7 +202,7 @@ pub enum Message {
 }
 
 impl Message {
-    /// Parses a `LocoNet` message from `buf`.
+    /// Parses a model railroads message from `buf`.
     ///
     /// # Errors
     ///
@@ -433,7 +433,7 @@ impl Message {
         return msg.iter().fold(0, |acc, &b| acc ^ b) == 0xFF;
     }
 
-    /// Parses the given [`Message`] to a [`Vec<u8>`] using the `LocoNet` protocol.
+    /// Parses the given [`Message`] to a [`Vec<u8>`] using the model railroads protocol.
     pub fn to_message(self) -> Vec<u8> {
         // Parses the message
         let mut message = match self {

@@ -1,11 +1,11 @@
 blank_issues_enabled: false
 contact_links:
-  - name: LocoNet Discussions
+  - name: Discussions
     url: https://github.com/juhu1705/locodrive/discussions
-    about: Please ask and answer questions about the LocoNet protocol here.
-  - name: LocoNet Rocrail documentation
+    about: Please ask and answer questions about this project here.
+  - name: Rocrails protocol documentation
     url: https://wiki.rocrail.net/doku.php?id=loconet:ln-pe-en
-    about: A listing on all LocoNet messages
+    about: A listing on all messages
   - name: locodrive documentation
     url: https://juhu1705.github.io/locodrive/doc/locodrive
     about: The rust doc of this project

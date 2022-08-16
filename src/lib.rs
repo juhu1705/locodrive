@@ -1,10 +1,10 @@
-/// Holds all arguments used in `LocoNet` message
+/// Holds all arguments used in the messages
 pub mod args;
 /// Holds all error messages that may occur
 pub mod error;
-/// Holds a [`loco_controller::LocoNetController`] to manage communication to a serial port based `LocoNet`
+/// Holds a [`loco_controller::LocoDriveController`] to manage communication to a serial port based model railroad system
 pub mod loco_controller;
-/// Holds the [`protocol::Message`]s that can be send to and received from the `LocoNet`.
+/// Holds the [`protocol::Message`]s that can be send to and received from the model railroad system.
 pub mod protocol;
-/// Holds test on the `LocoNet`
+/// Holds test for controlling the correctness of the implemented protocol
 mod tests;

@@ -4,7 +4,7 @@ use std::fmt::{Debug, Display, Formatter};
 use crate::error::MessageParseError;
 use crate::protocol::Message;
 
-/// Represents a `LocoNet` address of 14 byte length.
+/// Represents a trains address of 14 byte length.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct AddressArg(u16);
 
@@ -12,12 +12,12 @@ impl AddressArg {
     /// Creates a new address.
     ///
     /// Please consider keeping in range between 0 and 16383.
-    /// Higher values may not be send correctly to the `LocoNet`.
+    /// Higher values may not be supported by this address implementation.
     pub fn new(adr: u16) -> Self {
         Self(adr)
     }
 
-    /// Parses the message bytes from an `LocoNet` message into an `AddressArg`
+    /// Parses the message bytes from a model railroads message into an `AddressArg`
     ///
     /// # Parameters
     ///
@@ -39,21 +39,21 @@ impl AddressArg {
     /// Sets the address hold by this [`AddressArg`]
     ///
     /// Please consider keeping in range between 0 and 16383.
-    /// Higher values may not be send correctly to the `LocoNet`.
+    /// Higher values may not be supported by this address implementation.
     pub fn set_address(&mut self, address: u16) {
         self.0 = address;
     }
 
     /// # Returns
     ///
-    /// The low part of this address to send to the `LocoNet`
+    /// seven least significant loco address bits
     pub(crate) fn adr1(&self) -> u8 {
         (self.0 & 0x007F) as u8
     }
 
     /// # Returns
     ///
-    /// The high part of this address to send to the `LocoNet`
+    /// seven most significant loco address bits
     pub(crate) fn adr2(&self) -> u8 {
         ((self.0 >> 7) & 0x007F) as u8
     }
@@ -79,7 +79,7 @@ pub struct SwitchArg {
 
 impl SwitchArg {
     /// Creates a new switch information block that can be send to update a switch in a
-    /// `LocoNet` system using the corresponding [`crate::protocol::Message::SwReq`] message.
+    /// model railroad system using the corresponding [`crate::protocol::Message::SwReq`] message.
     ///
     /// # Parameters
     ///
@@ -94,7 +94,7 @@ impl SwitchArg {
         }
     }
 
-    /// Parses the arguments of an incomming loco net message to a [`SwitchArg`].
+    /// Parses the arguments of an incoming model railroads message to a [`SwitchArg`].
     ///
     /// # Parameters
     ///
@@ -220,7 +220,7 @@ impl SlotArg {
         Self(slot & 0x7F)
     }
 
-    /// Parses an incoming slot message from a `LocoNet` message.
+    /// Parses an incoming slot message from a model railroads message.
     ///
     /// # Parameter
     ///
@@ -267,11 +267,11 @@ impl SpeedArg {
         }
     }
 
-    /// Parses the speed from a `LocoNet` send speed.
+    /// Parses the speed from a model railroads send speed.
     ///
     /// # Parameters
     ///
-    /// - `spd`: The `LocoNet` messages speed
+    /// - `spd`: The model railroad messages speed
     pub(crate) fn parse(spd: u8) -> Self {
         match spd {
             0x00 => Self::Stop,
@@ -282,7 +282,7 @@ impl SpeedArg {
 
     /// # Returns
     ///
-    /// The `LocoNet` interpreted speed of this arg.
+    /// The model railroad interpreted speed of this arg.
     pub(crate) fn spd(&self) -> u8 {
         match *self {
             SpeedArg::Stop => 0x00,
@@ -344,7 +344,7 @@ impl DirfArg {
         Self(dirf)
     }
 
-    /// Parses the direction from a `LocoNet` message.
+    /// Parses the direction from a model railroad message.
     pub(crate) fn parse(dirf: u8) -> Self {
         Self(dirf & 0x3F)
     }
@@ -401,11 +401,11 @@ impl DirfArg {
         }
     }
 
-    /// Parses this [`DirfArg`] in the corresponding `LocoNet` message format.
+    /// Parses this [`DirfArg`] in the corresponding model railroad message format.
     ///
     /// # Returns
     ///
-    /// The to this arg corresponding `LocoNet` message value.
+    /// The to this arg corresponding model railroad message value.
     pub(crate) fn dirf(&self) -> u8 {
         self.0
     }
@@ -435,7 +435,7 @@ pub struct TrkArg {
     power: bool,
     /// The tracks idle state.
     idle: bool,
-    /// `true`: This master implements `LocoNet 1.1` capability.
+    /// `true`: This master implements this protocol capability.
     /// `false`: This master is `DT200`.
     mlok1: bool,
     /// Indicates that masters programming track is busy.
@@ -449,7 +449,7 @@ impl TrkArg {
     ///
     /// - `power`: The tracks power state (`On`/`OFF`)
     /// - `idle`: The tracks idle state
-    /// - `mlok1`: The protocol Version to use. 0 = `DT200`, 1 = `LocoNet 1.1`
+    /// - `mlok1`: The protocol Version to use. 0 = `DT200`, 1 = this protocol
     /// - `prog_busy`: Busy status for programming track (Slot 124)
     pub fn new(power: bool, idle: bool, mlok1: bool, prog_busy: bool) -> Self {
         TrkArg {
@@ -460,7 +460,7 @@ impl TrkArg {
         }
     }
 
-    /// Parses a `LocoNet` messages trk arg to this struct by extracting the required values.
+    /// Parses a model railroad messages trk arg to this struct by extracting the required values.
     ///
     /// # Parameters
     ///
@@ -496,7 +496,7 @@ impl TrkArg {
     ///
     /// The available protocol version by the master.
     ///
-    /// - `true` = `LocoNet 1.1`
+    /// - `true` = this protocol is fully supported
     /// - `false` = `DT200`
     pub fn mlok1(&self) -> bool {
         self.mlok1
@@ -509,11 +509,11 @@ impl TrkArg {
         self.prog_busy
     }
 
-    /// Parses this arg to a valid `LocoNet` track message byte.
+    /// Parses this arg to a valid model railroad track message byte.
     ///
     /// # Returns
     ///
-    /// The `LocoNet` trk message byte matching this [`TrkArg`].
+    /// The model railroad trk message byte matching this [`TrkArg`].
     pub(crate) fn trk_arg(&self) -> u8 {
         let mut trk_arg = if self.power { 0x01 } else { 0x00 };
         if !self.idle {
@@ -558,11 +558,11 @@ impl SndArg {
         Self(snd)
     }
 
-    /// Parses a `LocoNet` based function message byte to this arg.
+    /// Parses a model railroad based function message byte to this arg.
     ///
     /// # Parameters
     ///
-    /// - `snd`: A `LocoNet` formatted snd byte
+    /// - `snd`: A model railroad formatted snd byte
     pub(crate) fn parse(snd: u8) -> Self {
         Self(snd & 0x0F)
     }
@@ -599,7 +599,7 @@ impl SndArg {
         }
     }
 
-    /// Parses this [`SndArg`] to a `LocoNet` snd message byte
+    /// Parses this [`SndArg`] to a model railroad snd message byte
     pub(crate) fn snd(&self) -> u8 {
         self.0
     }
@@ -696,7 +696,7 @@ impl Stat1Arg {
         }
     }
 
-    /// Parses a `LocoNet` formatted `stat1` byte into this arg
+    /// Parses a model railroad formatted `stat1` byte into this arg
     ///
     /// # Parameters
     ///
@@ -766,7 +766,7 @@ impl Stat1Arg {
         self.decoder_type
     }
 
-    /// Parses this arg to a `LocoNet` defined stat1 message byte
+    /// Parses this arg to a model railroad defined stat1 message byte
     pub(crate) fn stat1(&self) -> u8 {
         let mut stat1: u8 = if self.s_purge { 0x80 } else { 0x00 };
 
@@ -797,14 +797,25 @@ impl Stat1Arg {
     }
 }
 
+/// Extension part for the slot status holding some additional slot information
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct Stat2Arg {
+    /// If slots ADV consist is suppressed
     has_adv: bool,
+    /// ID1/2 is not used for ID
     no_id_usage: bool,
+    /// If this ID is no encoded alias
     id_encoded_alias: bool,
 }
 
 impl Stat2Arg {
+    /// Creates a new status argument
+    ///
+    /// # Parameters
+    ///
+    /// - `has_adv`: If this slot has suppressed ADV consist
+    /// - `no_id_usage`: If this slots ID1/2 values are not used to represent the ID
+    /// - `id_encoded_alias`: If this ID is no encoded alias
     pub fn new(has_adv: bool, no_id_usage: bool, id_encoded_alias: bool) -> Self {
         Stat2Arg {
             has_adv,
@@ -813,6 +824,7 @@ impl Stat2Arg {
         }
     }
 
+    /// Parses a received `stat2` byte by the model railroad to this struct
     pub(crate) fn parse(stat2: u8) -> Self {
         let has_adv = stat2 & 0x01 != 0;
 
@@ -827,18 +839,28 @@ impl Stat2Arg {
         }
     }
 
+    /// # Returns
+    ///
+    /// If this slot has suppressed advanced control v
     pub fn has_adv(&self) -> bool {
         self.has_adv
     }
 
+    /// # Returns
+    ///
+    /// If this slot has suppressed adv
     pub fn no_id_usage(&self) -> bool {
         self.no_id_usage
     }
 
+    /// # Returns
+    ///
+    /// If this messages id is no encoded alias
     pub fn id_encoded_alias(&self) -> bool {
         self.id_encoded_alias
     }
 
+    /// Parses the values hold by this argument to one byte
     pub fn stat2(&self) -> u8 {
         let mut stat2 = if self.has_adv { 0x01 } else { 0x00 };
         if self.no_id_usage {
@@ -3039,5 +3061,4 @@ impl ProgrammingAbortedArg {
             ],
         }
     }
-
 }

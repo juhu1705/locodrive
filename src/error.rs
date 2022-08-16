@@ -3,7 +3,7 @@ use std::fmt::{Display, Formatter};
 use std::io;
 
 /// Represents an Error occurring when a message was received
-/// but could not be passed correctly to a valid and known `LocoNet` message.
+/// but could not be passed correctly to a valid and known message.
 #[derive(Debug, Clone)]
 pub enum MessageParseError {
     /// The OpCode of the message was unknown, maybe that code is not implemented yet.
@@ -39,27 +39,27 @@ impl From<io::Error> for MessageParseError {
     }
 }
 
-/// This error type is used to describe errors appearing on [`crate::loco_controller::LocoNetController::send_message()`]
+/// This error type is used to describe errors appearing on [`crate::loco_controller::LocoDriveController::send_message()`]
 #[derive(Debug, Copy, Clone)]
-pub enum LocoNetSendingError {
+pub enum LocoDriveSendingError {
     /// If the reader is closed. This should not happen normally.
-    /// If it happens your [`crate::loco_controller::LocoNetController`] is corrupted and can no longer be used.
+    /// If it happens your [`crate::loco_controller::LocoDriveController`] is corrupted and can no longer be used.
     IllegalState,
-    /// The `LocoNet` does not respond in the specified time.
+    /// The railroad control system does not respond in the specified time.
     Timeout,
-    /// The `LocoNet` connection returns writing with an error.
+    /// The railroad control system connection returns writing with an error.
     /// Please recheck your connection.
     NotWritable
 }
 
-impl Display for LocoNetSendingError {
+impl Display for LocoDriveSendingError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match *self {
             Self::Timeout => write!(f, "connection timed out"),
             Self::NotWritable => write!(f, "could not write to port"),
-            Self::IllegalState => write!(f, "loco net connection in illegal state"),
+            Self::IllegalState => write!(f, "connection in illegal state"),
         }
     }
 }
 
-impl Error for LocoNetSendingError {}
+impl Error for LocoDriveSendingError {}

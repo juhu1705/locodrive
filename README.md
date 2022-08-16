@@ -1,13 +1,13 @@
 # LocoDrive [![Tests](https://github.com/juhu1705/locodrive/actions/workflows/rust.yml/badge.svg?branch=main)](https://github.com/juhu1705/locodrive/actions/workflows/rust.yml)[![Docs](https://github.com/juhu1705/locodrive/actions/workflows/doc.yml/badge.svg?branch=main)](https://github.com/juhu1705/locodrive/actions/workflows/doc.yml)
 
-A rust library for controlling a model train railroad based on the `LocoNet` system.
+A rust library for controlling a model train railroad system.
 
 ## Features
-| Feature                          | Description                                                                                      | Status |
-|----------------------------------|--------------------------------------------------------------------------------------------------|--------|
-| Sending control                  | Control of sending messages to the `LocoNet`                                                     | DONE   |
-| Receiving control                | Possibility to handle received messages                                                          | DONE   |
-| Configuration of the connection  | Control over the configuration settings of the `LocoNet` connection like BaudRate or FlowControl | DONE   |
+| Feature                          | Description                                                                                           | Status |
+|----------------------------------|-------------------------------------------------------------------------------------------------------|--------|
+| Sending control                  | Control of sending messages to the model railroad                                                     | DONE   |
+| Receiving control                | Possibility to handle received messages                                                               | DONE   |
+| Configuration of the connection  | Control over the configuration settings of the model railroad connection like BaudRate or FlowControl | DONE   |
 
 ## Importing the LocoDrive
 
@@ -16,12 +16,12 @@ As rust is able to use GitHub repositories directly as dependencies you can simp
 
 ## Using the LocoDrive
 
-The LocoDrive has the struct `loco_controller::LocoNetController` made for connecting to a LocoNet over a serial port.
+The LocoDrive has the struct `loco_controller::LocoDriveController` made for connecting to a model railroad over a serial port.
 This reader will care of parsing received messages correctly before sending them to you.
 
 ## Documentation
 
-The documentation is published [here](https://juhu1705.github.io/locodrive)
+The documentation is published [here](https://juhu1705.github.io/locodrive/doc/locodrive)
 
 ## Committing to the LocoDrive
 
@@ -33,7 +33,7 @@ To set up the project yourself please make sure to have rust installed.
 
 To commit to this repository please consider the Contributing rules.
 
-Please note: Always add me to your pull request to test your changes with an active `LocoNet` connection 
+Please note: Always add me to your pull request to test your changes with an active model railroad connection 
 or add some test logs to your commitment.
 
 ## Used Dependencies
@@ -47,6 +47,6 @@ or add some test logs to your commitment.
 | bytes        | MIT     |
 | tokio        | MIT     |
 
-### Loco Net information
+### Protocol information
 
-For getting the needed information about the loco net protocol I mostly used the [rocrail wiki](https://wiki.rocrail.net/doku.php?id=loconet:ln-pe-en). Thanks for the detailed information.
+For getting the needed information about the used protocol I mostly used the [rocrail wiki](https://wiki.rocrail.net/doku.php?id=loconet:ln-pe-en). Thanks for the detailed information.
