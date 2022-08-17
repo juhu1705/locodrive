@@ -23,7 +23,7 @@ mod tests {
         test_one_message(Message::UnlinkSlots(SlotArg::new(10), SlotArg::new(1)));
         test_one_message(Message::ConsistFunc(SlotArg::new(10), DirfArg::new(true, false, false, true, false, false)));
         test_one_message(Message::SlotStat1(SlotArg::new(10), Stat1Arg::new(true, Consist::Free, State::Idle, DecoderType::Regular28)));
-        test_one_message(Message::LongAck(LopcArg::new(10), Ack1Arg::new(0)));
+        test_one_message(Message::LongAck(LopcArg::new(10), Ack1Arg::new(true)));
         test_one_message(Message::InputRep(InArg::new(10, SourceType::Ds54Aux, SensorLevel::Low, true)));
         test_one_message(Message::SwRep(SnArg::new_c_t(10, false, true)));
         test_one_message(Message::SwReq(SwitchArg::new(10, SwitchDirection::Curved, false)));
