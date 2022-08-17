@@ -709,7 +709,7 @@ impl Stat1Arg {
             0x08 => Consist::LogicalTop,
             0x40 => Consist::LogicalSubMember,
             0x00 => Consist::Free,
-            _ => panic!("No valid consist is given!"),
+            _ => Consist::Free,
         };
 
         let state = match stat1 & 0x30 {
@@ -717,7 +717,7 @@ impl Stat1Arg {
             0x20 => State::Idle,
             0x10 => State::Common,
             0x00 => State::Free,
-            _ => panic!("No valid state is given!"),
+            _ => State::Free,
         };
 
         let decoder_type = match stat1 & 0x07 {
@@ -860,7 +860,9 @@ impl Stat2Arg {
         self.id_encoded_alias
     }
 
-    /// Parses the values hold by this argument to one byte
+    /// # Returns
+    ///
+    /// The values hold by this argument as one byte
     pub fn stat2(&self) -> u8 {
         let mut stat2 = if self.has_adv { 0x01 } else { 0x00 };
         if self.no_id_usage {
@@ -873,107 +875,167 @@ impl Stat2Arg {
     }
 }
 
+/// Represents a copy of the operation code with the highest bit erased
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct LopcArg(u8);
 
 impl LopcArg {
+    /// Creates a new operation code copy with the highest bit erased from the given op code byte.
+    ///
+    /// To get a messages operation code you can use: [Message::opc()]
     pub fn new(opc: u8) -> Self {
-        LopcArg::parse(opc)
+        LopcArg::parse(opc & 0x7F)
     }
 
+    /// Parses a new operation code copy from an incoming byte
     pub(crate) fn parse(lopc: u8) -> Self {
-        Self(lopc & !0x80)
+        Self(lopc & 0x7F)
     }
 
+    /// # Returns
+    ///
+    /// The operation code copy argument
     pub(crate) fn lopc(&self) -> u8 {
         self.0
     }
 
-    pub fn set_opc(&mut self, opc: u8) {
-        self.0 = opc & !0x80
-    }
-
+    /// Checks whether an messages operation code matches the operation code held by this argument
+    ///
+    /// # Parameter
+    ///
+    /// - `message`: The message to check operation code matching for
+    ///
+    /// # Returns
+    ///
+    /// If the messages operation code matches the operation code hold by this argument
     pub fn check_opc(&self, message: &Message) -> bool {
-        message.opc() & !0x80 == self.0
+        message.opc() & 0x7F == self.0
     }
 }
 
+/// Holds a response code for a before received message
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct Ack1Arg(u8);
 
 impl Ack1Arg {
-    pub fn new(code: u8) -> Self {
-        Self(code)
+    /// Creates a new acknowledgment answer
+    ///
+    /// # Parameter
+    ///
+    /// - `success`: If this acknowledgment indicates that the request was successfully
+    pub fn new(success: bool) -> Self {
+        Self(if success { 0x7F } else { 0x00 })
     }
 
+    /// This creates a new acknowledgment answer with only the `code` to send as answer.
+    ///
+    /// `0x7F` means the request succeeded and `0x00` means the request was denied.
+    ///
+    /// If you want to mark that you accepted the message use `0x01` and when you want to indicate a blind acceptance use `0x40`
+    pub fn new_advanced(code: u8) -> Self {
+        Self(code & 0x7F)
+    }
+
+    /// Parses the acknowledgment type from a byte
     pub(crate) fn parse(ack1: u8) -> Self {
         Self(ack1)
     }
 
-    pub fn ack1(&self) -> u8 {
+    /// # Returns
+    ///
+    /// The acknowledgment parsed to a byte
+    pub(crate) fn ack1(&self) -> u8 {
         self.0
     }
 
+    /// # Returns
+    ///
+    /// If this message indicates the operation succeeded
     pub fn success(&self) -> bool {
         self.0 == 0x7F
     }
 
+    /// # Returns
+    ///
+    /// If the message has not failed
     pub fn limited_success(&self) -> bool {
         self.0 != 0x00
     }
 
+    /// # Returns
+    ///
+    /// If this message indicates the operation failure
     pub fn failed(&self) -> bool {
-        self.0 == 0
+        self.0 == 0x00
     }
 
+    /// # Returns
+    ///
+    /// If this message indicates the operation was accepted but not succeeded yet
     pub fn accepted(&self) -> bool {
-        self.0 == 1
+        self.0 == 0x01
     }
 
+    /// # Returns
+    ///
+    /// If this message indicates the operation was accepted without checks, but not succeeded yet
     pub fn accepted_blind(&self) -> bool {
         self.0 == 0x40
-    }
-
-    pub fn set_code(&mut self, code: u8) {
-        self.0 = code
     }
 }
 
 impl Display for Ack1Arg {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         if self.failed() {
-            write!(f, "ack1: (failed, ack: {})", self.0,)
+            write!(f, "ack1: (failed)")
         } else if self.accepted() {
-            write!(f, "ack1: (accepted, ack: {})", self.0,)
+            write!(f, "ack1: (accepted)")
         } else if self.accepted_blind() {
-            write!(f, "ack1: (accepted_blind, ack: {})", self.0,)
+            write!(f, "ack1: (accepted_blind)")
         } else {
             write!(f, "ack1: (success, ack: {})", self.0,)
         }
     }
 }
 
+/// Indicates which source type the input came from
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum SourceType {
     Ds54Aux,
     Switch,
 }
 
+/// A sensors detection state
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum SensorLevel {
+    /// The sensor detects some energy flow (sensor on)
     High,
+    /// The sensor detects no energy flow (sensor off)
     Low,
 }
 
+/// Represents an sensor input argument
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct InArg {
+    /// The sensors argument
     address: u16,
+    /// The sensors source type
     input_source: SourceType,
+    /// The sensors detection state
     sensor_level: SensorLevel,
+    /// The sensors control bit that is reserved to future use
     control_bit: bool,
 }
 
 impl InArg {
+    /// Creates a new sensors input argument
+    ///
+    /// # Parameters
+    ///
+    /// - `address`: The sensors address (0 - 2047)
+    /// - `input_source`: The sensors input source type
+    /// - `sensor_level`: The sensors state (High = On, Low = Off)
+    /// - `control_bit`: Control bit that is reserved for future use.
     pub fn new(
         address: u16,
         input_source: SourceType,
@@ -988,7 +1050,8 @@ impl InArg {
         }
     }
 
-    pub fn parse(in1: u8, in2: u8) -> Self {
+    /// Parses the sensors information from two bytes `in1` and `in2`
+    pub(crate) fn parse(in1: u8, in2: u8) -> Self {
         let mut address = in1 as u16;
         address |= (in2 as u16 & 0x0F) << 7;
 
@@ -1012,52 +1075,70 @@ impl InArg {
         }
     }
 
+    /// # Returns
+    ///
+    /// The address of this sensor
     pub fn address(&self) -> u16 {
         self.address
     }
 
+    /// # Returns
+    ///
+    /// The address with the sensors source type set as least significant bit
     pub fn address_ds54(&self) -> u16 {
         (self.address << 1)
-            | if self.input_source == SourceType::Switch {
-                1
-            } else {
-                0
+            | match self.input_source {
+                SourceType::Switch => 1,
+                SourceType::Ds54Aux => 0,
             }
     }
 
+    /// # Returns
+    ///
+    /// The sensors source type
     pub fn input_source(&self) -> SourceType {
         self.input_source
     }
 
+    /// # Returns
+    ///
+    /// The sensors state (High = On, Low = Off)
     pub fn sensor_level(&self) -> SensorLevel {
         self.sensor_level
     }
 
+    /// # Returns
+    ///
+    /// The sensors control bit
     pub fn control_bit(&self) -> bool {
         self.control_bit
     }
 
+    /// Sets the address of this sensor argument
+    ///
+    /// # Parameters
+    ///
+    /// - `address`: The address to set (0 - 2047)
     pub fn set_address(&mut self, address: u16) {
-        debug_assert_eq!(
-            address & 0x07FF,
-            0,
-            "address must only use the 11 least significant bits"
-        );
-        self.address = address;
+        if address <= 0x07FF {
+            self.address = address;
+        }
     }
 
+    /// Sets the address with the sensors source type as least significant bit
+    ///
+    /// # Parameters
+    ///
+    /// - `address`: The address and as least significant the source type
     pub fn set_address_ds54(&mut self, address_ds54: u16) {
-        debug_assert_eq!(
-            self.address & 0x0FFF,
-            0,
-            "address must only use the 12 least significant bits"
-        );
-        self.input_source = if address_ds54 & 1 == 0 {
-            SourceType::Ds54Aux
-        } else {
-            SourceType::Switch
-        };
-        self.set_address(address_ds54 >> 1);
+        if address_ds54 <= 0x0FFF {
+            self.input_source = if address_ds54 & 1 == 0 {
+                SourceType::Ds54Aux
+            } else {
+                SourceType::Switch
+            };
+            self.set_address(address_ds54 >> 1);
+        }
     }
 
     pub fn set_input_source(&mut self, input_source: SourceType) {
@@ -1072,11 +1153,11 @@ impl InArg {
         self.control_bit = control_bit;
     }
 
-    pub fn in1(&self) -> u8 {
+    pub(crate) fn in1(&self) -> u8 {
         self.address as u8 & 0x7F
     }
 
-    pub fn in2(&self) -> u8 {
+    pub(crate) fn in2(&self) -> u8 {
         let mut in2 = ((self.address >> 7) as u8) & 0x0F;
         in2 |= match self.input_source {
             SourceType::Ds54Aux => 0x00,
