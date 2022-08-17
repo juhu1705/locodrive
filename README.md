@@ -1,4 +1,4 @@
-# LocoDrive [![Tests](https://github.com/juhu1705/locodrive/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/juhu1705/locodrive/actions/workflows/test.yml)[![Docs](https://github.com/juhu1705/locodrive/actions/workflows/doc.yml/badge.svg?branch=main)](https://github.com/juhu1705/locodrive/actions/workflows/doc.yml)
+# LocoDrive [![Tests](https://github.com/juhu1705/locodrive/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/juhu1705/locodrive/actions/workflows/test.yml)[![Docs](https://github.com/juhu1705/locodrive/actions/workflows/doc.yml/badge.svg?branch=main)](https://github.com/juhu1705/locodrive/actions/workflows/doc.yml)[![rust-clippy analyze](https://github.com/juhu1705/locodrive/actions/workflows/rust-clippy.yml/badge.svg)](https://github.com/juhu1705/locodrive/actions/workflows/rust-clippy.yml)
 
 A rust library for controlling a model train railroad system.
 
