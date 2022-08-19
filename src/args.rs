@@ -1129,7 +1129,7 @@ impl InArg {
     ///
     /// # Parameters
     ///
-    /// - `address`: The address and as least significant the source type
+    /// - `address_ds54`: The address and as least significant the source type
     pub fn set_address_ds54(&mut self, address_ds54: u16) {
         if address_ds54 <= 0x0FFF {
             self.input_source = if address_ds54 & 1 == 0 {
@@ -1141,22 +1141,36 @@ impl InArg {
         }
     }
 
+    /// Sets the sensors input source type
+    ///
+    /// # Parameters
+    ///
+    /// - `input_source`: The input source the sensor used
     pub fn set_input_source(&mut self, input_source: SourceType) {
         self.input_source = input_source;
     }
 
+    /// Sets the sensors activation state
+    ///
+    /// - `sensor_level`: The activation state to use (High = ON, Low = OFF)
     pub fn set_sensor_level(&mut self, sensor_level: SensorLevel) {
         self.sensor_level = sensor_level;
     }
 
+    /// Sets the control bit of this sensor arg to the given value.
+    ///
+    /// - `control_bit`: The bit to set
     pub fn set_control_bit(&mut self, control_bit: bool) {
         self.control_bit = control_bit;
     }
 
+    /// Parses this sensors least significant address bit in one byte
     pub(crate) fn in1(&self) -> u8 {
         self.address as u8 & 0x7F
     }
 
+    /// Parses this sensors most significant address bit and its input source type
+    /// as well as the sensor activation state and control bit in one byte,
     pub(crate) fn in2(&self) -> u8 {
         let mut in2 = ((self.address >> 7) as u8) & 0x0F;
         in2 |= match self.input_source {
@@ -1174,6 +1188,7 @@ impl InArg {
     }
 }
 
+/// The
 #[derive(Copy, Clone, Eq)]
 pub struct SnArg {
     address: u16,
