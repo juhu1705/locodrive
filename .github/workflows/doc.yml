@@ -27,7 +27,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
       - name: Setup Pages
-        uses: actions/configure-pages@v1
+        uses: actions/configure-pages@v2
       - name: Build Rust documentation
         run: cargo doc --no-deps --target-dir "./_site"
       - name: Add index page
