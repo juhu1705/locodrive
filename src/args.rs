@@ -1001,7 +1001,9 @@ impl Display for Ack1Arg {
 /// Indicates which source type the input came from
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum SourceType {
+    /// Switch is connected over a DS54 port
     Ds54Aux,
+    /// Switch is directly accessible
     Switch,
 }
 
@@ -1152,12 +1154,16 @@ impl InArg {
 
     /// Sets the sensors activation state
     ///
+    /// # Parameters
+    ///
     /// - `sensor_level`: The activation state to use (High = ON, Low = OFF)
     pub fn set_sensor_level(&mut self, sensor_level: SensorLevel) {
         self.sensor_level = sensor_level;
     }
 
     /// Sets the control bit of this sensor arg to the given value.
+    ///
+    /// # Parameters
     ///
     /// - `control_bit`: The bit to set
     pub fn set_control_bit(&mut self, control_bit: bool) {
@@ -1188,53 +1194,22 @@ impl InArg {
     }
 }
 
-/// The
-#[derive(Copy, Clone, Eq)]
-pub struct SnArg {
-    address: u16,
-    format: bool,
-    c: bool,
-    t: bool,
-    input_source: SourceType,
-    sensor_level: SensorLevel,
+/// Metainformation for a device
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+pub enum SnArg {
+    /// 0 - Device address
+    /// 1 - If this device is a switch
+    /// 2 - If this device is active
+    SwitchType(u16, bool, bool),
+    /// 0 - Device address
+    /// 1 - The activation state of the straight switch part
+    /// 2 - The activation state of the curved switch part
+    SwitchDirectionStatus(u16, SensorLevel, SensorLevel)
 }
 
 impl SnArg {
-    pub fn new_c_t(address: u16, c: bool, t: bool) -> Self {
-        let input_source = if c {
-            SourceType::Switch
-        } else {
-            SourceType::Ds54Aux
-        };
-
-        let sensor_level = if t {
-            SensorLevel::High
-        } else {
-            SensorLevel::Low
-        };
-
-        SnArg {
-            address: address & 0x07FF,
-            format: false,
-            c,
-            t,
-            input_source,
-            sensor_level,
-        }
-    }
-
-    pub fn new_f(address: u16, input_source: SourceType, sensor_level: SensorLevel) -> Self {
-        SnArg {
-            address: address & 0x07FF,
-            format: true,
-            c: false,
-            t: false,
-            input_source,
-            sensor_level,
-        }
-    }
-
-    pub fn parse(sn1: u8, sn2: u8) -> Self {
+    /// Parses the sensors information from two bytes `sn1` and `sn2`
+    pub(crate) fn parse(sn1: u8, sn2: u8) -> Self {
         let mut address = sn1 as u16;
         address |= (sn2 as u16 & 0x0F) << 7;
 
@@ -1243,168 +1218,64 @@ impl SnArg {
         let t = sn2 & 0x10 == 0x10;
         let c = sn2 & 0x20 == 0x20;
 
-        let input_source = if c {
-            SourceType::Switch
+        if format {
+            SnArg::SwitchType(
+                address,
+                c,
+                t
+            )
         } else {
-            SourceType::Ds54Aux
-        };
-
-        let sensor_level = if t {
-            SensorLevel::High
-        } else {
-            SensorLevel::Low
-        };
-
-        SnArg {
-            address,
-            format,
-            c,
-            t,
-            input_source,
-            sensor_level,
+            SnArg::SwitchDirectionStatus(
+                address,
+                if c { SensorLevel::High } else { SensorLevel::Low },
+                if t { SensorLevel::High } else { SensorLevel::Low }
+            )
         }
     }
 
+    /// # Returns
+    ///
+    /// The device address
     pub fn address(&self) -> u16 {
-        self.address
-    }
-
-    pub fn format(&self) -> bool {
-        self.format
-    }
-
-    pub fn c_u8(&self) -> Result<u8, String> {
-        if !self.format {
-            Ok(self.c as u8)
-        } else {
-            Err("Wrong sn format".to_owned())
+        match *self {
+            SnArg::SwitchType(address, ..) => address,
+            SnArg::SwitchDirectionStatus(address, ..) => address
         }
     }
 
-    pub fn t_u8(&self) -> Result<u8, String> {
-        if !self.format {
-            Ok(self.t as u8)
-        } else {
-            Err("Wrong sn format".to_owned())
-        }
+    /// # Returns
+    ///
+    /// Parses this low address bits in a writeable byte
+    pub(crate) fn sn1(&self) -> u8 {
+        (match *self {
+            SnArg::SwitchDirectionStatus(address, ..) => address,
+            SnArg::SwitchType(address, ..) => address
+        } as u8) & 0x7F
     }
 
-    pub fn input_source(&self) -> Result<SourceType, String> {
-        if self.format {
-            Ok(self.input_source)
-        } else {
-            Err("Wrong sn format".to_owned())
-        }
-    }
+    /// # Returns
+    ///
+    /// Parses the status information and the high address bits into a writeable byte
+    pub(crate) fn sn2(&self) -> u8 {
+        match *self {
+            SnArg::SwitchType(address, is_switch, state) => {
+                let mut sn2 = ((address >> 7) as u8 & 0x0F) | 0x40;
 
-    pub fn sensor_level(&self) -> Result<SensorLevel, String> {
-        if self.format {
-            Ok(self.sensor_level)
-        } else {
-            Err("Wrong sn format".to_owned())
-        }
-    }
+                sn2 |= if is_switch { 0x20 } else { 0x00 };
+                sn2 | if state { 0x10 } else { 0x00 }
+            }
+            SnArg::SwitchDirectionStatus(address, straight_status, curved_status) => {
+                let mut sn2 = (address >> 7) as u8 & 0x0F;
 
-    pub fn set_address(&mut self, address: u16) {
-        self.address = address & 0x07FF;
-    }
-
-    pub fn set_format(&mut self, format: bool) {
-        self.format = format;
-    }
-
-    pub fn set_c(&mut self, c: bool) -> Result<(), String> {
-        if self.format {
-            return Err("Wrong sn format".to_owned());
-        }
-
-        self.c = c;
-        Ok(())
-    }
-
-    pub fn set_t(&mut self, t: bool) -> Result<(), String> {
-        if self.format {
-            return Err("Wrong sn format".to_owned());
-        }
-
-        self.t = t;
-        Ok(())
-    }
-
-    pub fn set_input_source(&mut self, input_source: SourceType) -> Result<(), String> {
-        if !self.format {
-            return Err("Wrong sn format".to_owned());
-        }
-
-        self.input_source = input_source;
-        Ok(())
-    }
-
-    pub fn set_sensor_level(&mut self, sensor_level: SensorLevel) -> Result<(), String> {
-        if !self.format {
-            return Err("Wrong sn format".to_owned());
-        }
-
-        self.sensor_level = sensor_level;
-        Ok(())
-    }
-
-    pub fn sn1(&self) -> u8 {
-        (self.address as u8) & 0x7F
-    }
-
-    pub fn sn2(&self) -> u8 {
-        let mut sn2 = (self.address >> 7) as u8 & 0x0F;
-        if self.format {
-            sn2 |=
-                0x40 | match self.input_source {
-                    SourceType::Ds54Aux => 0x00,
-                    SourceType::Switch => 0x20,
-                } | match self.sensor_level {
+                sn2 |= match straight_status {
+                    SensorLevel::High => 0x20,
+                    SensorLevel::Low => 0x00
+                };
+                sn2 | match curved_status {
                     SensorLevel::High => 0x10,
-                    SensorLevel::Low => 0x00,
+                    SensorLevel::Low => 0x00
                 }
-        } else {
-            if self.c {
-                sn2 |= 0x20;
             }
-            if self.t {
-                sn2 |= 0x10;
-            }
-        }
-
-        sn2
-    }
-}
-
-impl PartialEq for SnArg {
-    fn eq(&self, other: &Self) -> bool {
-        if !(self.format == other.format && self.address == other.address) {
-            return false;
-        }
-
-        if self.format {
-            self.input_source == other.input_source && self.sensor_level == other.sensor_level
-        } else {
-            self.t == other.t && self.c == other.c
-        }
-    }
-}
-
-impl Debug for SnArg {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        if self.format {
-            write!(
-                f,
-                "sn: (address: {}, input_source: {:?}, sensor_level: {:?})",
-                self.address, self.input_source, self.sensor_level,
-            )
-        } else {
-            write!(
-                f,
-                "sn: (address: {}, c: {:?}, t: {:?})",
-                self.address, self.c, self.t,
-            )
         }
     }
 }
