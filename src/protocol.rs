@@ -171,6 +171,25 @@ pub enum Message {
         SndArg,
         IdArg,
     ),
+    /// Holds a SlRdData response of the programming slot 127
+    ///
+    /// The first arguments represent this message in the format of a SlRdData response,
+    /// but some data where extra interpreted in the below message arguments.
+    ProgrammingFinalResponse(
+        SlotArg,
+        Stat1Arg,
+        AddressArg,
+        SpeedArg,
+        DirfArg,
+        TrkArg,
+        Stat2Arg,
+        SndArg,
+        IdArg,
+        Pcmd,
+        PStat,
+        AddressArg,
+        CvDataArg
+    ),
     /// Indicates that the programming service mode is aborted.
     ProgrammingAborted(ProgrammingAbortedArg),
 
@@ -396,17 +415,37 @@ impl Message {
                 args[1], args[2], args[3], args[4], args[5], args[6], args[7], args[8], args[9],
                 args[10], args[11],
             ))),
-            0xE7 => Ok(Self::SlRdData(
-                SlotArg::parse(args[1]),
-                Stat1Arg::parse(args[2]),
-                AddressArg::parse(args[8], args[3]),
-                SpeedArg::parse(args[4]),
-                DirfArg::parse(args[5]),
-                TrkArg::parse(args[6]),
-                Stat2Arg::parse(args[7]),
-                SndArg::parse(args[9]),
-                IdArg::parse(args[10], args[11]),
-            )),
+            0xE7 => {
+                if args[1] == 0x7C {
+                    Ok(Self::ProgrammingFinalResponse(
+                        SlotArg::parse(args[1]),
+                        Stat1Arg::parse(args[2]),
+                        AddressArg::parse(args[8], args[3]),
+                        SpeedArg::parse(args[4]),
+                        DirfArg::parse(args[5]),
+                        TrkArg::parse(args[6]),
+                        Stat2Arg::parse(args[7]),
+                        SndArg::parse(args[9]),
+                        IdArg::parse(args[10], args[11]),
+                        Pcmd::parse(args[2]),
+                        PStat::parse(args[3]),
+                        AddressArg::parse(args[4], args[5]),
+                        CvDataArg::parse(args[7], args[8], args[9])
+                    ))
+                } else {
+                    Ok(Self::SlRdData(
+                        SlotArg::parse(args[1]),
+                        Stat1Arg::parse(args[2]),
+                        AddressArg::parse(args[8], args[3]),
+                        SpeedArg::parse(args[4]),
+                        DirfArg::parse(args[5]),
+                        TrkArg::parse(args[6]),
+                        Stat2Arg::parse(args[7]),
+                        SndArg::parse(args[9]),
+                        IdArg::parse(args[10], args[11]),
+                    ))
+                }
+            },
             0xE6 => {
                 Ok(Message::ProgrammingAborted(ProgrammingAbortedArg::parse(args[0], &args[1..])))
             },
@@ -484,6 +523,21 @@ impl Message {
                 stat2.stat2(),
                 adr.adr2(),
                 snd.snd(),
+                id.id1(),
+                id.id2(),
+            ],
+            Message::ProgrammingFinalResponse(slot, stat1, adr, spd, dirf, trk, stat2, snd, id, pcmd, stat, opsa, cv_data) => vec![
+                0xE7_u8,
+                0x0E_u8,
+                slot.slot(),
+                stat1.stat1() | pcmd.pcmd(),
+                adr.adr1() | stat.stat(),
+                spd.spd() | opsa.adr2(),
+                dirf.dirf() | opsa.adr1(),
+                trk.trk_arg(),
+                stat2.stat2() | cv_data.cvh(),
+                adr.adr2() | cv_data.cvl(),
+                snd.snd() | cv_data.data7(),
                 id.id1(),
                 id.id2(),
             ],
@@ -565,6 +619,7 @@ impl Message {
             Message::UhliFun(..) => 0xD4,
             Message::WrSlData(..) => 0xEF,
             Message::SlRdData(..) => 0xE7,
+            Message::ProgrammingFinalResponse(..) => 0xE7,
             Message::ProgrammingAborted(..) => 0xE6,
             Message::PeerXfer(..) => 0xE5,
             Message::Rep(..) => 0xE4,

@@ -1,7 +1,7 @@
 /// Tests all testable core functions of this module
 #[cfg(test)]
 mod tests {
-    use crate::args::{Ack1Arg, AddressArg, Consist, CvDataArg, DecoderType, DirfArg, DstArg, FastClock, FunctionArg, FunctionGroup, IdArg, ImAddress, ImArg, ImFunctionType, InArg, LissyIrReport, LopcArg, MultiSenseArg, Pcmd, ProgrammingAbortedArg, PxctData, RepStructure, RFID5Report, RFID7Report, SensorLevel, SlotArg, SnArg, SndArg, SourceType, SpeedArg, Stat1Arg, Stat2Arg, State, SwitchArg, SwitchDirection, TrkArg, WheelcntReport, WrSlDataGeneral, WrSlDataPt, WrSlDataStructure, WrSlDataTime};
+    use crate::args::{Ack1Arg, AddressArg, Consist, CvDataArg, DecoderType, DirfArg, DstArg, FastClock, FunctionArg, FunctionGroup, IdArg, ImAddress, ImArg, ImFunctionType, InArg, LissyIrReport, LopcArg, MultiSenseArg, Pcmd, ProgrammingAbortedArg, PStat, PxctData, RepStructure, RFID5Report, RFID7Report, SensorLevel, SlotArg, SnArg, SndArg, SourceType, SpeedArg, Stat1Arg, Stat2Arg, State, SwitchArg, SwitchDirection, TrkArg, WheelcntReport, WrSlDataGeneral, WrSlDataPt, WrSlDataStructure, WrSlDataTime};
     use crate::protocol::Message;
 
     /// Tests if the message parsing is reliable
@@ -80,6 +80,21 @@ mod tests {
             Stat2Arg::new(true, true, true),
             SndArg::new(true, true, true, true),
             IdArg::new(12),
+        ));
+        test_one_message(Message::ProgrammingFinalResponse(
+            SlotArg::new(124),
+            Stat1Arg::new(false, Consist::LogicalSubMember, State::Idle, DecoderType::AdrMobile28),
+            AddressArg::new(0),
+            SpeedArg::Stop,
+            DirfArg::new(false, false, false, false, false, false),
+            TrkArg::new(false, false, false, false),
+            Stat2Arg::new(false, false, false),
+            SndArg::new(false, false, false, false),
+            IdArg::new(0),
+            Pcmd::new(true, true, false, false, true),
+            PStat::new(false, false, false, false),
+            AddressArg::new(0),
+            CvDataArg::new()
         ));
         test_one_message(
             Message::ProgrammingAborted(

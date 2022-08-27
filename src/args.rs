@@ -465,7 +465,7 @@ impl TrkArg {
     /// # Parameters
     ///
     /// - `trk_arg`: The track message to parse
-    pub fn parse(trk_arg: u8) -> Self {
+    pub(crate) fn parse(trk_arg: u8) -> Self {
         let power = trk_arg & 0x01 == 0x01;
         let idle = trk_arg & 0x02 == 0x00;
         let mlok1 = trk_arg & 0x04 == 0x04;
@@ -863,7 +863,7 @@ impl Stat2Arg {
     /// # Returns
     ///
     /// The values hold by this argument as one byte
-    pub fn stat2(&self) -> u8 {
+    pub(crate) fn stat2(&self) -> u8 {
         let mut stat2 = if self.has_adv { 0x01 } else { 0x00 };
         if self.no_id_usage {
             stat2 |= 0x04;
@@ -1283,6 +1283,11 @@ impl SnArg {
 }
 
 /// Id of the slot controlling device
+///
+/// - 0: No ID being used
+/// - 00/80 - 3F/81: ID shows PC usage
+/// - 00/02 - 3F/83: System reserved
+/// - 00/04 - 3F/FE: normal throttle range
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct IdArg(u16);
 
@@ -1756,15 +1761,28 @@ impl Pcmd {
     }
 }
 
+/// Holding programming error flags
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct PStat {
+    /// User canceled operation
     user_aborted: bool,
+    /// No read acknowledgment
     no_read_ack: bool,
+    /// No write acknowledgment
     no_write_ack: bool,
+    /// No train on the programming track to programm
     programming_track_empty: bool,
 }
 
 impl PStat {
+    /// Creates new programming error information
+    ///
+    /// # Parameters
+    ///
+    /// - `user_aborted`: If an user canceled the programming operation
+    /// - `no_read_ack`: No read acknowledgment received
+    /// - `no_write_ack`: No write acknowledgment received
+    /// - `programming_track_empty`: No train is on the programming track
     pub fn new(
         user_aborted: bool,
         no_read_ack: bool,
@@ -1779,7 +1797,8 @@ impl PStat {
         }
     }
 
-    pub fn parse(stat: u8) -> Self {
+    /// Parses the error flags from one byte
+    pub(crate) fn parse(stat: u8) -> Self {
         let user_aborted = stat & 0x01 == 0x01;
         let no_read_ack = stat & 0x02 == 0x02;
         let no_write_ack = stat & 0x04 == 0x04;
@@ -1793,23 +1812,38 @@ impl PStat {
         }
     }
 
+    /// # Returns
+    ///
+    /// If the operation was aborted by a user
     pub fn user_aborted(&self) -> bool {
         self.user_aborted
     }
 
+    /// # Returns
+    ///
+    /// If the operation was canceled by a missing read acknowledgment
     pub fn no_read_ack(&self) -> bool {
         self.no_read_ack
     }
 
+    /// # Returns
+    ///
+    /// If the operation was canceled by a missing write acknowledgment
     pub fn no_write_ack(&self) -> bool {
         self.no_write_ack
     }
 
+    /// # Returns
+    ///
+    /// If no train was found to programm
     pub fn programming_track_empty(&self) -> bool {
         self.programming_track_empty
     }
 
-    pub fn stat(&self) -> u8 {
+    /// # Returns
+    ///
+    /// A byte representing all found error states
+    pub(crate) fn stat(&self) -> u8 {
         let mut stat = if self.user_aborted { 0x01 } else { 0x00 };
         if self.no_read_ack {
             stat |= 0x02;
@@ -1824,14 +1858,17 @@ impl PStat {
     }
 }
 
-#[derive(Copy, Clone, Eq, PartialEq, Default)]
+/// Holds control variables and data arguments.
+#[derive(Copy, Clone, Eq, PartialEq)]
 pub struct CvDataArg(u16, u8);
 
 impl CvDataArg {
+    /// Creates a new empty arg.
     pub fn new() -> CvDataArg {
         CvDataArg(0, 0)
     }
 
+    /// Parses cv and data from three byte
     pub(crate) fn parse(cvh: u8, cvl: u8, data7: u8) -> Self {
         let mut cv_arg = cvl as u16;
         let data = ((cvh & 0x02) << 6) | data7;
@@ -1844,14 +1881,34 @@ impl CvDataArg {
         CvDataArg(cv_arg, data)
     }
 
+    /// # Parameters
+    ///
+    /// - `d_num`: Wich data bit to return (Value must be between 0 and 7 (inclusive))
+    ///
+    /// # Returns
+    ///
+    /// The data bit specified by `d_num`
     pub fn data(&self, d_num: u8) -> bool {
         (self.1 >> d_num) & 0x01 != 0
     }
 
+    /// # Parameters
+    ///
+    /// - `cv_num`: Wich cv bit to return (Value must be between 0 and 9 (inclusive))
+    ///
+    /// # Returns
+    ///
+    /// The cv bit specified by `cv_num`
     pub fn cv(&self, cv_num: u8) -> bool {
         self.0 >> cv_num & 1 != 0
     }
 
+    /// Sets the specified data bit to the given state
+    ///
+    /// # Parameters
+    ///
+    /// - `d_num`: Wich data bit to set
+    /// - `value`: The value to set the data bit to
     pub fn set_data(&mut self, d_num: u8, value: bool) -> &mut Self {
         let mask = 1 << d_num;
 
@@ -1864,6 +1921,12 @@ impl CvDataArg {
         self
     }
 
+    /// Sets the specified cv bit to the given state
+    ///
+    /// # Parameters
+    ///
+    /// - `cv_num`: Wich cv bit to set
+    /// - `value`: The value to set the cv bit to
     pub fn set_cv(&mut self, cv_num: u8, value: bool) -> &mut Self {
         let mask = (1 << cv_num) & 0x03FF;
 
@@ -1876,7 +1939,10 @@ impl CvDataArg {
         self
     }
 
-    pub fn cvh(&self) -> u8 {
+    /// # Returns
+    ///
+    /// The high part of the cv values and the seventh data bit as one byte
+    pub(crate) fn cvh(&self) -> u8 {
         let mut cvh = (self.0 >> 7) as u8;
         let high_cv = cvh & 0x06 << 3;
         cvh &= 0x01;
@@ -1887,20 +1953,28 @@ impl CvDataArg {
         cvh
     }
 
-    pub fn cvl(&self) -> u8 {
+    /// # Returns
+    ///
+    /// The low part of the cv values as one byte
+    pub(crate) fn cvl(&self) -> u8 {
         self.0 as u8 & 0x7F
     }
 
-    pub fn data7(&self) -> u8 {
+    /// # Returns
+    ///
+    /// The data bits from 0 to 6 (inclusive) as one byte
+    pub(crate) fn data7(&self) -> u8 {
         self.1 & 0x7F
     }
 }
 
+/// Overridden for precise value orientated output
 impl Debug for CvDataArg {
+    /// Writes all args and cv values to the formatter
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "cv_data_arg: (data: (d0: {}, d1: {}, d2: {}, d3: {}, d4: {}, d5: {}, d6: {}, d7: {}), cv:(cv0: {}, cv1: {}, cv2: {}, cv3: {}, cv4: {}, cv5: {}, cv6: {}, cv7: {}, cv8: {}, cv9: {}))",
+            "cv_data_arg: (data: (d0: {}, d1: {}, d2: {}, d3: {}, d4: {}, d5: {}, d6: {}, d7: {}), cv: (cv0: {}, cv1: {}, cv2: {}, cv3: {}, cv4: {}, cv5: {}, cv6: {}, cv7: {}, cv8: {}, cv9: {}))",
             self.data(0),
             self.data(1),
             self.data(2),
