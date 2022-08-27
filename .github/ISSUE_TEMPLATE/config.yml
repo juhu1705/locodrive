@@ -9,9 +9,6 @@ contact_links:
   - name: locodrive documentation
     url: https://juhu1705.github.io/locodrive/doc/locodrive
     about: The rust doc of this project
-  - name: locodrive wiki
-    url: https://github.com/juhu1705/locodrive/wiki
-    about: Work in progress wiki on the LocoNet and this locodrive
   - name: Model Train contribution project board
     url: https://github.com/users/juhu1705/projects/5
     about: A listing of all model railroad based Issues and their work state

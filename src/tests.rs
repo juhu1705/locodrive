@@ -1,7 +1,7 @@
 /// Tests all testable core functions of this module
 #[cfg(test)]
 mod tests {
-    use crate::args::{Ack1Arg, AddressArg, Consist, CvDataArg, DecoderType, DirfArg, DstArg, FastClock, FunctionArg, IdArg, ImAddress, ImArg, ImFunctionType, InArg, LissyIrReport, LopcArg, MultiSenseArg, Pcmd, ProgrammingAbortedArg, PxctData, RepStructure, RFID5Report, RFID7Report, SensorLevel, SlotArg, SnArg, SndArg, SourceType, SpeedArg, Stat1Arg, Stat2Arg, State, SwitchArg, SwitchDirection, TrkArg, WheelcntReport, WrSlDataGeneral, WrSlDataPt, WrSlDataStructure, WrSlDataTime};
+    use crate::args::{Ack1Arg, AddressArg, Consist, CvDataArg, DecoderType, DirfArg, DstArg, FastClock, FunctionArg, FunctionGroup, IdArg, ImAddress, ImArg, ImFunctionType, InArg, LissyIrReport, LopcArg, MultiSenseArg, Pcmd, ProgrammingAbortedArg, PxctData, RepStructure, RFID5Report, RFID7Report, SensorLevel, SlotArg, SnArg, SndArg, SourceType, SpeedArg, Stat1Arg, Stat2Arg, State, SwitchArg, SwitchDirection, TrkArg, WheelcntReport, WrSlDataGeneral, WrSlDataPt, WrSlDataStructure, WrSlDataTime};
     use crate::protocol::Message;
 
     /// Tests if the message parsing is reliable
@@ -33,7 +33,7 @@ mod tests {
 
         // Test 6 bytes messages
         test_one_message(Message::MultiSense(MultiSenseArg::new(3, false, 3, 7), AddressArg::new(12)));
-        test_one_message(Message::UhliFun(SlotArg::new(128), FunctionArg::new(2)));
+        test_one_message(Message::UhliFun(SlotArg::new(128), FunctionArg::new(FunctionGroup::F13TO19)));
 
         // Test messages of variable byte length
         test_one_message(Message::WrSlData(

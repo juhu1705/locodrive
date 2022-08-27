@@ -944,7 +944,7 @@ impl Ack1Arg {
     /// # Returns
     ///
     /// The acknowledgment parsed to a byte
-    pub(crate) fn ack1(&self) -> u8 {
+    pub fn ack1(&self) -> u8 {
         self.0
     }
 
@@ -1197,13 +1197,15 @@ impl InArg {
 /// Metainformation for a device
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub enum SnArg {
-    /// 0 - Device address
-    /// 1 - If this device is a switch
-    /// 2 - If this device is active
+    /// The devices meta information by device type
+    /// - 0: Device address
+    /// - 1: If this device is a switch
+    /// - 2: If this device is active
     SwitchType(u16, bool, bool),
-    /// 0 - Device address
-    /// 1 - The activation state of the straight switch part
-    /// 2 - The activation state of the curved switch part
+    /// The devices meta information by output
+    /// - 0: Device address
+    /// - 1: The activation state of the straight switch part
+    /// - 2: The activation state of the curved switch part
     SwitchDirectionStatus(u16, SensorLevel, SensorLevel)
 }
 
@@ -1280,44 +1282,69 @@ impl SnArg {
     }
 }
 
+/// Id of the slot controlling device
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct IdArg(u16);
 
 impl IdArg {
+    /// Creates a new device id
+    ///
+    /// # Parameters
+    ///
+    /// - `id`: A fourteen bit device address
     pub fn new(id: u16) -> Self {
         IdArg(id & 0x3FFF)
     }
 
-    pub fn parse(id1: u8, id2: u8) -> Self {
+    /// Parses the device id from two bytes `id1` and `id2`
+    pub(crate) fn parse(id1: u8, id2: u8) -> Self {
         IdArg((((id2 & 0x7F) as u16) << 7) | ((id1 & 0x7F) as u16))
     }
 
+    /// # Returns
+    ///
+    /// The device `id`
     pub fn id(&self) -> u16 {
         self.0
     }
 
-    pub fn id1(&self) -> u8 {
+    /// # Returns
+    ///
+    /// The seven least significant address bits
+    pub(crate) fn id1(&self) -> u8 {
         self.0 as u8 & 0x7F
     }
 
-    pub fn id2(&self) -> u8 {
+    /// # Returns
+    ///
+    /// The seven most significant address bits
+    pub(crate) fn id2(&self) -> u8 {
         (self.0 >> 7) as u8 & 0x7F
-    }
-
-    pub fn set_id(&mut self, id: u16) {
-        self.0 = id & 0x3FFF
     }
 }
 
+/// Represents power information for a specific railway sector
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct MultiSenseArg {
+    /// This messages three bit represented type
     m_type: u8,
+    /// The present state
     present: bool,
+    /// The board address corresponding to this message
     board_address: u8,
+    /// The zone corresponding to this message
     zone: u8,
 }
 
 impl MultiSenseArg {
+    /// Creates new power information for a specified railway sector
+    ///
+    /// # Parameters
+    ///
+    /// - `m_type`: The messages type
+    /// - `present`: The present state of the sender
+    /// - `board_address`: The board address
+    /// - `zone`: The zone address
     pub fn new(m_type: u8, present: bool, board_address: u8, zone: u8) -> Self {
         Self {
             m_type: m_type & 0x07,
@@ -1327,7 +1354,8 @@ impl MultiSenseArg {
         }
     }
 
-    pub fn parse(m_high: u8, zas: u8) -> Self {
+    /// Parses the power information id from two bytes `m_high` and `zas`
+    pub(crate) fn parse(m_high: u8, zas: u8) -> Self {
         let m_type = (0xE0 & m_high) >> 5;
         let present = 0x10 & m_high == 0x10;
         let board_address = ((0x0F & m_high) << 4) | ((zas & 0xF0) >> 4);
@@ -1341,53 +1369,95 @@ impl MultiSenseArg {
         }
     }
 
+    /// # Returns
+    ///
+    /// The three bit message type
     pub fn m_type(&self) -> u8 {
         self.m_type
     }
 
+    /// # Returns
+    ///
+    /// The senders present status
     pub fn present(&self) -> bool {
         self.present
     }
 
+    /// # Returns
+    ///
+    /// The sections board address
     pub fn board_address(&self) -> u8 {
         self.board_address
     }
 
+    /// # Returns
+    ///
+    /// The sections zone
     pub fn zone(&self) -> u8 {
         self.zone
     }
 
-    pub fn zas(&self) -> u8 {
+    /// # Returns
+    ///
+    /// One byte holding the least significant board address and zone bits
+    pub(crate) fn zas(&self) -> u8 {
         self.zone | ((self.board_address & 0x0F) << 4)
     }
 
-    pub fn m_high(&self) -> u8 {
+    /// # Returns
+    ///
+    /// The low address bits as well as the messages type and present status as one byte
+    pub(crate) fn m_high(&self) -> u8 {
         ((self.board_address & 0xF0) >> 4)
             | ((self.m_type & 0x07) << 5)
             | if self.present { 0x10 } else { 0x00 }
     }
 }
 
+/// The functions group
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub enum FunctionGroup {
+    /// Function bits 9, 10 and 11 are available
+    F9TO11,
+    /// Function bits 13 to 19 are available
+    F13TO19,
+    /// Function bits 12, 20 and 28 are available
+    F12F20F28,
+    /// Function bit 21 to 27 are available
+    F21TO27
+}
+
+/// Represents the function bits of one function group.
+///
+/// - 0: The functions group type
+/// - 1: The functions bits set
 #[derive(Copy, Clone, Eq, PartialEq)]
 pub struct FunctionArg(u8, u8);
 
 impl FunctionArg {
-    pub fn new(group: u8) -> Self {
-        FunctionArg(group, 0)
+    /// Creates a new function arg for a given group.
+    ///
+    /// # Parameters
+    ///
+    /// - `group`: The functions group to set the values to.
+    pub fn new(group: FunctionGroup) -> Self {
+        FunctionArg(match group {
+            FunctionGroup::F9TO11 => 0x07,
+            FunctionGroup::F13TO19 => 0x08,
+            FunctionGroup::F12F20F28 => 0x05,
+            FunctionGroup::F21TO27 => 0x09,
+        }, 0)
     }
 
-    pub fn c_new(group: u16) -> Self {
-        FunctionArg(group as u8, 0)
-    }
-
-    pub fn c_parse(group: u16, function: u16) -> Self {
-        FunctionArg(group as u8, function as u8)
-    }
-
-    pub fn parse(group: u8, function: u8) -> Self {
+    /// Parses the group and function bits from two bits.
+    pub(crate) fn parse(group: u8, function: u8) -> Self {
         FunctionArg(group, function)
     }
 
+    /// # Returns
+    ///
+    /// The value of the `f_num`s function bit value if this bit is contained in
+    /// this args function group.
     pub fn f(&self, f_num: u8) -> bool {
         if f_num > 8 && f_num < 12 && self.0 == 0x07 {
             (self.1 >> (f_num - 5)) & 1 != 0
@@ -1411,7 +1481,17 @@ impl FunctionArg {
         }
     }
 
-    pub fn set_f(&mut self, f_num: u8, value: bool) {
+    /// Sets the `f_num` function bits value, if it is present in this args function group.
+    ///
+    /// # Parameters
+    ///
+    /// - `f_num`: The bit to set
+    /// - `value`: The bits value
+    ///
+    /// # Returns
+    ///
+    /// A mutable reference of this struct instance.
+    pub fn set_f(&mut self, f_num: u8, value: bool) -> &mut Self {
         let mask = if f_num > 8 && f_num < 12 && self.0 == 0x07 {
             1 << (f_num - 5)
         } else if (f_num == 12 || f_num == 20 || f_num == 28) && self.0 == 0x05 {
@@ -1435,56 +1515,130 @@ impl FunctionArg {
         } else {
             self.1 &= !mask;
         }
+
+        self
     }
 
-    pub fn group(&self) -> u8 {
+    /// # Returns
+    ///
+    /// The function group specifying which function values may be set.
+    pub fn function_group(&self) -> FunctionGroup {
+        match self.0 {
+            0x07 => FunctionGroup::F9TO11,
+            0x05 => FunctionGroup::F12F20F28,
+            0x08 => FunctionGroup::F13TO19,
+            0x09 => FunctionGroup::F21TO27,
+            _ => FunctionGroup::F9TO11,
+        }
+    }
+
+    /// # Returns
+    ///
+    /// The functions group represented as one byte.
+    pub(crate) fn group(&self) -> u8 {
         self.0
     }
 
-    pub fn function(&self) -> u8 {
+    /// # Returns
+    ///
+    /// The function bits represented as one byte.
+    pub(crate) fn function(&self) -> u8 {
         self.1
     }
 }
 
+/// Overriding debug to only display the relevant function bits.
 impl Debug for FunctionArg {
+    /// Prints the group corresponding function bit values.
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "function_arg: (f9: {}, f10: {}, f11: {}, f12: {}, f13: {}, f14: {}, f15: {}, f16: {}, f17: {}, f18: {}, f19: {}, f20: {}, f21: {}, f22: {}, f23: {}, f24: {}, f25: {}, f26: {}, f27: {}, f28: {})",
-            self.f(9),
-            self.f(10),
-            self.f(11),
-            self.f(12),
-            self.f(13),
-            self.f(14),
-            self.f(15),
-            self.f(16),
-            self.f(17),
-            self.f(18),
-            self.f(19),
-            self.f(20),
-            self.f(21),
-            self.f(22),
-            self.f(23),
-            self.f(24),
-            self.f(25),
-            self.f(26),
-            self.f(27),
-            self.f(28),
-        )
+        match self.function_group() {
+            FunctionGroup::F9TO11 => {
+                write!(f,
+                       "function_arg: (group: {:?}, f9: {}, f10: {}, f11: {})",
+                       FunctionGroup::F9TO11,
+                       self.f(9),
+                       self.f(10),
+                       self.f(11)
+                )
+            },
+            FunctionGroup::F13TO19 => {
+                write!(f,
+                       "function_arg: (group: {:?}, f13: {}, f14: {}, f15: {}, f16: {}, f17: {}, f18: {}, f19: {})",
+                       FunctionGroup::F13TO19,
+                       self.f(13),
+                       self.f(14),
+                       self.f(15),
+                       self.f(16),
+                       self.f(17),
+                       self.f(18),
+                       self.f(19),
+                )
+            },
+            FunctionGroup::F12F20F28 => {
+                write!(f,
+                       "function_arg: (group: {:?}, f12: {}, f20: {}, f28: {})",
+                       FunctionGroup::F12F20F28,
+                       self.f(12),
+                       self.f(20),
+                       self.f(28)
+                )
+            },
+            FunctionGroup::F21TO27 => {
+                write!(f,
+                       "function_arg: (group: {:?}, f21: {}, f22: {}, f23: {}, f24: {}, f25: {}, f26: {}, f27: {})",
+                       FunctionGroup::F21TO27,
+                       self.f(21),
+                       self.f(22),
+                       self.f(23),
+                       self.f(24),
+                       self.f(25),
+                       self.f(26),
+                       self.f(27)
+                )
+            },
+        }
     }
 }
 
+/// Representing the command mode used to write to the programming track
+///
+/// # Type Codes Table
+///
+/// | [Pcmd::byte_mode] | [Pcmd::ops_mode] | [Pcmd::ty0] | [Pcmd::ty1] | Mode                            |
+/// |-------------------|------------------|-------------|-------------|---------------------------------|
+/// | 0                 | 0                | 0           | 0           | Abort operation                 |
+/// | 1                 | 0                | 0           | 0           | Paged mode                      |
+/// | x                 | 0                | 0           | 1           | Direct mode                     |
+/// | x                 | 0                | 1           | 0           | Physical register               |
+/// | x                 | 0                | 1           | 1           | service track reserved function |
+/// | x                 | 1                | 0           | 0           | no feedback                     |
+/// | x                 | 1                | 0           | 0           | feedback                        |
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct Pcmd {
+    /// Whether to write or if `false` read
     write: bool,
+    /// Whether to use byte or bitwise operation mode
     byte_mode: bool,
+    /// Whether to use the main track or the programming track
     ops_mode: bool,
-    ty0: bool, // Programing type select bit
-    ty1: bool, // prog type select bit
+    /// First programing type select bit
+    ty0: bool,
+    /// Second programming type select bit
+    ty1: bool,
 }
 
 impl Pcmd {
+    /// Creates a new programm control argument
+    ///
+    /// For near information on `ty0` and `ty1` see [Pcmd].
+    ///
+    /// # Parameters
+    ///
+    /// - `write`: Whether to write or read
+    /// - `byte_mode`: Whether to use bytewise or bitwise mode
+    /// - `ops_mode`: Whether to use the main track or the programming track
+    /// - `ty0`: See [Pcmd]
+    /// - `ty1`: See [Pcmd]
     pub fn new(write: bool, byte_mode: bool, ops_mode: bool, ty0: bool, ty1: bool) -> Self {
         Pcmd {
             write,
@@ -1495,7 +1649,8 @@ impl Pcmd {
         }
     }
 
-    pub fn parse(pcmd: u8) -> Self {
+    /// Reads the programming control information from one byte
+    pub(crate) fn parse(pcmd: u8) -> Self {
         let write = pcmd & 0x20 == 0x20;
         let byte_mode = pcmd & 0x40 == 0x40;
         let ops_mode = pcmd & 0x02 == 0x02;
@@ -1511,47 +1666,79 @@ impl Pcmd {
         }
     }
 
+    /// # Returns
+    ///
+    /// Whether to write or read
     pub fn write(&self) -> bool {
         self.write
     }
 
+    /// # Returns
+    ///
+    /// Whether to use byte or bit mode
     pub fn byte_mode(&self) -> bool {
         self.byte_mode
     }
 
+    /// # Returns
+    ///
+    /// Whether to use the main or programming track
     pub fn ops_mode(&self) -> bool {
         self.ops_mode
     }
 
+    /// See [Pcmd]
     pub fn ty0(&self) -> bool {
         self.ty0
     }
 
+    /// See [Pcmd]
     pub fn ty1(&self) -> bool {
         self.ty1
     }
 
+
+    /// Sets the write argument
+    ///
+    /// # Parameters
+    ///
+    /// - `write`: Whether to write or read
     pub fn set_write(&mut self, write: bool) {
         self.write = write
     }
 
+    /// Sets the byte_mode argument
+    ///
+    /// # Parameters
+    ///
+    /// - `byte_mode`: Whether to use byte or bit mode
     pub fn set_byte_mode(&mut self, byte_mode: bool) {
         self.byte_mode = byte_mode
     }
 
+    /// Sets the ops_mode argument
+    ///
+    /// # Parameters
+    ///
+    /// - `ops_mode`: Whether to use the main or programming track
     pub fn set_ops_mode(&mut self, ops_mode: bool) {
         self.ops_mode = ops_mode
     }
 
+    /// See [Pcmd]
     pub fn set_ty0(&mut self, ty0: bool) {
         self.ty0 = ty0
     }
 
+    /// See [Pcmd]
     pub fn set_ty1(&mut self, ty1: bool) {
         self.ty1 = ty1
     }
 
-    pub fn pcmd(&self) -> u8 {
+    /// # Returns
+    ///
+    /// Parses the programming information data into one representing byte
+    pub(crate) fn pcmd(&self) -> u8 {
         let mut pcmd = if self.write { 0x20 } else { 0x00 };
         if self.byte_mode {
             pcmd |= 0x40;
