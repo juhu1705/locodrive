@@ -1859,7 +1859,7 @@ impl PStat {
 }
 
 /// Holds control variables and data arguments.
-#[derive(Copy, Clone, Eq, PartialEq)]
+#[derive(Copy, Clone, Eq, PartialEq, Default)]
 pub struct CvDataArg(u16, u8);
 
 impl CvDataArg {
@@ -1997,39 +1997,65 @@ impl Debug for CvDataArg {
     }
 }
 
+/// Holding the clocks information
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct FastClock {
+    /// The clocks tick rate. (0 = Frozen), (x = x to 1 rate),
     clk_rate: u8,
-    frac_minsl: u8,
-    frac_minsh: u8,
+    /// Intern subminute counter
+    frac_mins: u16,
+    /// The clocks minutes
     mins: u8,
+    /// The clocks set hours
     hours: u8,
+    /// The clocks set days
     days: u8,
+    /// The clock control
     clk_cntrl: u8,
 }
 
 impl FastClock {
+
+    /// Creates a new clock synchronise information
+    ///
+    /// # Parameters
+    ///
+    /// - `clock_rate`: The clocks tick rate. (0 = Frozen), (x = x to 1 rate)
+    /// - `frac_mins`: The internal subminute counter
+    /// - `mins`: The clock mins calculated by 256-MINS%60
+    /// - `hours`: The clocks hours calculated by 256-HRS%24
+    /// - `days`: The number of 24 hour cycles passed
+    /// - `clk_cntrl`: Clock control information. third bit must be true to mark this clock data valid.
     pub fn new(
         clk_rate: u8,
-        frac_minsl: u8,
-        frac_minsh: u8,
+        frac_mins: u16,
         mins: u8,
         hours: u8,
         days: u8,
         clk_cntrl: u8
     ) -> Self {
-        FastClock::parse(
+        FastClock {
             clk_rate,
-            frac_minsl,
-            frac_minsh,
+            frac_mins,
             mins,
             hours,
             days,
             clk_cntrl
-        )
+        }
     }
 
-    pub(crate) fn parse(
+    /// Calculates the clock information from 7 bytes
+    ///
+    /// # Parameters
+    ///
+    /// - `clock_rate`: The clocks tick rate. (0 = Frozen), (x = x to 1 rate)
+    /// - `frac_minsl`: The least significant part of the internal subminute counter
+    /// - `frac_minsh`: The most significant part of the internal subminute counter
+    /// - `mins`: The clock mins calculated by 256-MINS%60
+    /// - `hours`: The clocks hours calculated by 256-HRS%24
+    /// - `days`: The number of 24 hour cycles passed
+    /// - `clk_cntrl`: Clock control information. third bit must be true to mark this clock data valid.
+    fn parse(
         clk_rate: u8,
         frac_minsl: u8,
         frac_minsh: u8,
@@ -2040,8 +2066,7 @@ impl FastClock {
     ) -> Self {
         FastClock {
             clk_rate: clk_rate & 0x7F,
-            frac_minsl,
-            frac_minsh,
+            frac_mins: (frac_minsl as u16) | ((frac_minsh as u16) << 8),
             mins,
             hours,
             days,
@@ -2049,58 +2074,109 @@ impl FastClock {
         }
     }
 
+    /// # Returns
+    ///
+    /// The clocks rate
     pub fn clk_rate(&self) -> u8 {
         self.clk_rate
     }
 
-    pub fn frac_minsl(&self) -> u8 {
-        self.frac_minsl
+    /// # Returns
+    ///
+    /// The clocks least significant internal counter part
+    fn frac_minsl(&self) -> u8 {
+        self.frac_mins as u8
     }
 
-    pub fn frac_minsh(&self) -> u8 {
-        self.frac_minsh
+    /// # Returns
+    ///
+    /// The clocks most significant internal counter part
+    fn frac_minsh(&self) -> u8 {
+        (self.frac_mins >> 8) as u8
     }
 
-    fn mins(&self) -> u8 {
+    /// # Returns
+    ///
+    /// The internal clock counter
+    pub fn frac_mins(&self) -> u16 {
+        self.frac_mins
+    }
+
+    /// # Returns
+    ///
+    /// The clocks minutes. Represented by (256-MINS%60)
+    pub fn mins(&self) -> u8 {
         self.mins
     }
 
-    fn hours(&self) -> u8 {
+    /// # Returns
+    ///
+    /// The clocks hours. Represented by (256-HRS%24)
+    pub fn hours(&self) -> u8 {
         self.hours
     }
 
-    fn days(&self) -> u8 {
+    /// # Retuns
+    ///
+    /// The count of 24 hour cycles passed
+    pub fn days(&self) -> u8 {
         self.days
     }
 
+    /// # Returns
+    ///
+    /// General clock control information.
+    ///
+    /// The third bit represents the valid state of this message (0 = invalid)
     pub fn clk_cntrl(&self) -> u8 {
         self.clk_cntrl
     }
 }
 
+/// The function bits accessible by the corresponding [ImArg]
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum ImFunctionType {
+    /// Functions 9 to 12 (inclusive) are accessible
     F9to12,
+    /// Functions 13 to 20 (inclusive) are accessible
     F13to20,
+    /// Functions 21 to 28 (inclusive) are accessible
     F21to28
 }
 
+/// The address in the right format used by the corresponding [ImArg]
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum ImAddress {
+    /// A short 8 bit address
     Short(u8),
+    /// A long 16 bit address
     Long(u16)
 }
 
+/// This arg hold function bit information
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct ImArg {
+    /// I don't get the concrete meaning and functionality of this arg
     dhi: u8,
+    /// This is the address to set the function bits to
     address: ImAddress,
+    /// This is the functions settable by this arg
     function_type: ImFunctionType,
+    /// This holds the function bits
     function_bits: u8,
+    /// Unused for now, do what you want
     im5: u8,
 }
 
 impl ImArg {
+    /// Creates a new function arg
+    ///
+    /// # Parameters
+    ///
+    /// - `dhi`: I don't get the concrete meaning and functionality of this arg
+    /// - `address`: The address to set the function bits for
+    /// - `function_type`: Wich functions should be settable
+    /// - `im5`: Unused parameter
     pub fn new(
         dhi: u8,
         address: ImAddress,
@@ -2116,6 +2192,14 @@ impl ImArg {
         }
     }
 
+    /// Calculates the information of one im arg from eight bytes
+    ///
+    /// # Parameters
+    ///
+    /// - `_`: Not used, as it was always the same value
+    /// - `reps`: The function bits range type
+    /// - `dhi`: Not understood by me
+    /// - `im1-5`: The address and function bits
     pub(crate) fn parse(
         _: u8,
         reps: u8,
@@ -2179,11 +2263,10 @@ impl ImArg {
         }
     }
 
-    pub fn check_byte(&self) -> u8 {
-        0x7F
-    }
-
-    pub fn reps(&self) -> u8 {
+    /// # Returns
+    ///
+    /// The type of this function arg as one byte
+    pub(crate) fn reps(&self) -> u8 {
         match self.address {
             ImAddress::Short(_) => match self.function_type {
                 ImFunctionType::F9to12 => 0x24,
@@ -2198,22 +2281,36 @@ impl ImArg {
         }
     }
 
+    /// # Returns
+    ///
+    /// The dhi byte, holding special address and bit information.
     pub fn dhi(&self) -> u8 {
         self.dhi
     }
 
+    /// # Returns
+    ///
+    /// The address in long or short format
     pub fn address(&self) -> ImAddress {
         self.address
     }
 
+    /// # Returns
+    ///
+    /// The type specifying wich function bits are settable
     pub fn function_type(&self) -> ImFunctionType {
         self.function_type
     }
 
-    pub fn function_bits(&self) -> u8 {
-        self.function_bits
-    }
-
+    /// Calculates the `f_num`s function bit
+    ///
+    /// # Parameters
+    ///
+    /// - `f_num`: The function bits number to get
+    ///
+    /// # Returns
+    ///
+    /// The value of the `f_num`s function bit
     pub fn f(&self, f_num: u8) -> bool {
         let dist = match self.function_type {
             ImFunctionType::F13to20 => 21,
@@ -2224,6 +2321,12 @@ impl ImArg {
         (self.function_bits >> (f_num - dist)) & 0x01 == 0x01
     }
 
+    /// Sets the `f_num`s function bit to the given value `f`.
+    ///
+    /// # Parameters
+    ///
+    /// - `f_num`: The function bit to set
+    /// - `f`: The value to set the function bit to
     pub fn set_f(&mut self, f_num: u8, f: bool) {
         let dist = match self.function_type {
             ImFunctionType::F13to20 => 21,
@@ -2240,14 +2343,20 @@ impl ImArg {
         }
     }
 
-    pub fn im1(&self) -> u8 {
+    /// # Returns
+    ///
+    /// The first function arg
+    pub(crate) fn im1(&self) -> u8 {
         match self.address {
             ImAddress::Short(adr) => adr,
             ImAddress::Long(adr) => adr as u8,
         }
     }
 
-    pub fn im2(&self) -> u8 {
+    /// # Returns
+    ///
+    /// The second function arg
+    pub(crate) fn im2(&self) -> u8 {
         match self.address {
             ImAddress::Short(_) => {
                 match self.function_type {
@@ -2262,7 +2371,10 @@ impl ImArg {
         }
     }
 
-    pub fn im3(&self) -> u8 {
+    /// # Returns
+    ///
+    /// The third function arg
+    pub(crate) fn im3(&self) -> u8 {
         match self.address {
             ImAddress::Short(_) => {
                 if self.function_type == ImFunctionType::F9to12 {
@@ -2281,27 +2393,41 @@ impl ImArg {
         }
     }
 
-    pub fn im4(&self) -> u8 {
+    /// # Returns
+    ///
+    /// The fourth function arg
+    pub(crate) fn im4(&self) -> u8 {
         if self.reps() == 0x34 && self.function_type != ImFunctionType::F9to12 {
             return self.function_bits;
         }
         0x00
     }
 
-    pub fn im5(&self) -> u8 {
+    /// # Returns
+    ///
+    /// The fifth function arg
+    pub(crate) fn im5(&self) -> u8 {
         self.im5
     }
 }
 
+/// This holds all message information of to sync the devices clocks
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct WrSlDataTime(FastClock, TrkArg, IdArg);
 
 impl WrSlDataTime {
+    /// Creates new clock sync information
+    ///
+    /// # Parameters
+    ///
+    /// - `fast_clock`: The clock information
+    /// - `trk_arg`: The track
+    /// - `id_arg`: The id
     pub fn new(fast_clock: FastClock, trk_arg: TrkArg, id_arg: IdArg) -> Self {
         WrSlDataTime(fast_clock, trk_arg, id_arg)
     }
 
-    pub fn parse(
+    pub(crate) fn parse(
         clk_rate: u8,
         frac_minsl: u8,
         frac_minsh: u8,
@@ -2322,28 +2448,60 @@ impl WrSlDataTime {
         )
     }
 
+    /// # Returns
+    ///
+    /// The clock information for synchronising
     pub fn fast_clock(&self) -> FastClock {
         self.0
     }
 
+    /// # Returns
+    ///
+    /// The systems track information
     pub fn trk_arg(&self) -> TrkArg {
         self.1
     }
 
+    /// # Returns
+    ///
+    /// The id
     pub fn id_arg(&self) -> IdArg {
         self.2
     }
 }
 
+/// Used for writing slot data to the programming track
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct WrSlDataPt(Pcmd, AddressArg, TrkArg, CvDataArg);
 
 impl WrSlDataPt {
+    /// Creates new data to write to the programming track
+    ///
+    /// # Parameters
+    ///
+    /// - `pcmd`: The programming command to use
+    /// - `opsa`: Operation mode programming bits as address
+    /// - `trk_arg`: The current track information to set
+    /// - `cv_data_arg`: The command value and data bits to programm
     pub fn new(pcmd: Pcmd, opsa: AddressArg, trk_arg: TrkArg, cv_data_arg: CvDataArg) -> Self {
         WrSlDataPt(pcmd, opsa, trk_arg, cv_data_arg)
     }
 
-    pub fn parse(
+    /// Parses a new programming write argument from the 10 message bytes
+    ///
+    /// # Parameters
+    ///
+    /// - `pcmd`: The programming command byte
+    /// - `_arg3`: For programming unused arg
+    /// - `hopsa`: High part of the operation mode
+    /// - `lopsa`: Low part of the operation mode
+    /// - `trk`: The track information as one byte
+    /// - `cvh`: High part of the command values
+    /// - `cvl`: Low part of the command values
+    /// - `data7`: The data
+    /// - `_arg10`: For programming unused arg
+    /// - `_arg11`: For programming unused arg
+    fn parse(
         pcmd: u8,
         _arg3: u8,
         hopsa: u8,
@@ -2363,18 +2521,30 @@ impl WrSlDataPt {
         )
     }
 
+    /// # Returns
+    ///
+    /// The programming command to use
     pub fn pcmd(&self) -> Pcmd {
         self.0
     }
 
+    /// # Returns
+    ///
+    /// The operation mode programming bits
     pub fn opsa(&self) -> AddressArg {
         self.1
     }
 
+    /// # Returns
+    ///
+    /// The track information
     pub fn trk_arg(&self) -> TrkArg {
         self.2
     }
 
+    /// # Returns
+    ///
+    /// The command values and data to write
     pub fn cv_data_arg(&self) -> CvDataArg {
         self.3
     }

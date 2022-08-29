@@ -64,7 +64,7 @@ mod tests {
         test_one_message(Message::WrSlData(
             WrSlDataStructure::DataTime(
                 WrSlDataTime::new(
-                    FastClock::new(12, 23, 2, 12, 22, 12, 17),
+                    FastClock::new(12, 23, 2, 12, 22, 0x30),
                     TrkArg::new(false, true, true, true),
                     IdArg::new(123),
                 )
