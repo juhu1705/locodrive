@@ -10,7 +10,7 @@ documentation = "https://juhu1705.github.io/locodrive/doc/locodrive"
 description = """
 A model railroad connection handler to read message from and write messages to serial port.
 """
-categories = ["loco net", "model train"]
+categories = ["model train"]
 
 [dependencies]
 tokio-serial = "5.4.1"
