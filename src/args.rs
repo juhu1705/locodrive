@@ -5,7 +5,7 @@ use crate::error::MessageParseError;
 use crate::protocol::Message;
 
 /// Represents a trains address of 14 byte length.
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct AddressArg(u16);
 
 impl AddressArg {
@@ -60,14 +60,14 @@ impl AddressArg {
 }
 
 /// Which direction state a switch is orientated to
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum SwitchDirection {
     Straight,
     Curved,
 }
 
 /// Holds switch state information to be read or write
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct SwitchArg {
     /// The address of the switch (0 - 2047)
     address: u16,
@@ -204,7 +204,7 @@ impl SwitchArg {
 /// | - 123   | fast clock                         |
 /// | - 124   | programming track                  |
 /// | - 127   | command station options            |
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct SlotArg(u8);
 
 impl SlotArg {
@@ -238,7 +238,7 @@ impl SlotArg {
 }
 
 /// Represents the speed set to a [`SlotArg`].
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, Hash, PartialEq)]
 pub enum SpeedArg {
     /// Performs a normal stop. Trains may stop smoothly when they receive a message force them to stop.
     Stop,
@@ -310,7 +310,7 @@ impl SpeedArg {
 /// Represents the direction and first five function bits of a slot.
 ///
 /// Function bit 0 may control a trains light
-#[derive(Copy, Clone, Eq, PartialEq)]
+#[derive(Copy, Clone, Eq, Hash, PartialEq)]
 pub struct DirfArg(u8);
 
 impl DirfArg {
@@ -429,7 +429,7 @@ impl Debug for DirfArg {
 }
 
 /// Holds the track information
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, Hash, PartialEq)]
 pub struct TrkArg {
     /// The tracks power state (`ON`/`OFF`).
     power: bool,
@@ -532,7 +532,7 @@ impl TrkArg {
 /// Holds the function flags 5 to 8.
 ///
 /// This function flags may be used for train sound management if available.
-#[derive(Copy, Clone, Eq, PartialEq)]
+#[derive(Copy, Clone, Eq, Hash, PartialEq)]
 pub struct SndArg(u8);
 
 impl SndArg {
@@ -621,7 +621,7 @@ impl Debug for SndArg {
 }
 
 /// Represents the link status of a slot
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, Hash, PartialEq)]
 pub enum Consist {
     /// Slot is linked up and down
     LogicalMid,
@@ -634,11 +634,11 @@ pub enum Consist {
 }
 
 /// Represents the usage status of a slot
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, Hash, PartialEq)]
 pub enum State {
     /// Indicates that this slot is in use by some device. The slot holds a loc address and is refreshed.
     ///
-    /// If you want to mark your slot as [`State::InUse`] simply perform a `NULL`-Move on this slot. (Move message with equal source and destination)
+    /// If you want to mark your slot as [`State::InUse`] simply perform a `NULL`-Move on this slot. (Move message with eq, Hashual source and destination)
     InUse,
     /// A loco adr is in the slot but the slot was not refreshed.
     Idle,
@@ -649,7 +649,7 @@ pub enum State {
 }
 
 /// Represents the decoders speed control message format used
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, Hash, PartialEq)]
 pub enum DecoderType {
     /// 28 step decoder with advanced DCC allowed
     Dcc28,
@@ -666,7 +666,7 @@ pub enum DecoderType {
 }
 
 /// Holds general slot status information.
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, Hash, PartialEq)]
 pub struct Stat1Arg {
     /// The slots purge status.
     s_purge: bool,
@@ -798,7 +798,7 @@ impl Stat1Arg {
 }
 
 /// Extension part for the slot status holding some additional slot information
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, Hash, PartialEq)]
 pub struct Stat2Arg {
     /// If slots ADV consist is suppressed
     has_adv: bool,
@@ -876,7 +876,7 @@ impl Stat2Arg {
 }
 
 /// Represents a copy of the operation code with the highest bit erased
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, Hash, PartialEq)]
 pub struct LopcArg(u8);
 
 impl LopcArg {
@@ -914,7 +914,7 @@ impl LopcArg {
 }
 
 /// Holds a response code for a before received message
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, Hash, PartialEq)]
 pub struct Ack1Arg(u8);
 
 impl Ack1Arg {
@@ -999,7 +999,7 @@ impl Display for Ack1Arg {
 }
 
 /// Indicates which source type the input came from
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum SourceType {
     /// Switch is connected over a DS54 port
     Ds54Aux,
@@ -1008,7 +1008,7 @@ pub enum SourceType {
 }
 
 /// A sensors detection state
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum SensorLevel {
     /// The sensor detects some energy flow (sensor on)
     High,
@@ -1017,7 +1017,7 @@ pub enum SensorLevel {
 }
 
 /// Represents an sensor input argument
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, Hash, PartialEq)]
 pub struct InArg {
     /// The sensors argument
     address: u16,
@@ -1195,7 +1195,7 @@ impl InArg {
 }
 
 /// Metainformation for a device
-#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+#[derive(Copy, Clone, Eq, Hash, PartialEq, Debug)]
 pub enum SnArg {
     /// The devices meta information by device type
     /// - 0: Device address
@@ -1288,7 +1288,7 @@ impl SnArg {
 /// - 00/80 - 3F/81: ID shows PC usage
 /// - 00/02 - 3F/83: System reserved
 /// - 00/04 - 3F/FE: normal throttle range
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, Hash, PartialEq)]
 pub struct IdArg(u16);
 
 impl IdArg {
@@ -1329,7 +1329,7 @@ impl IdArg {
 }
 
 /// Represents power information for a specific railway sector
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, Hash, PartialEq)]
 pub struct MultiSenseArg {
     /// This messages three bit represented type
     m_type: u8,
@@ -1420,7 +1420,7 @@ impl MultiSenseArg {
 }
 
 /// The functions group
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, Hash, PartialEq)]
 pub enum FunctionGroup {
     /// Function bits 9, 10 and 11 are available
     F9TO11,
@@ -1436,7 +1436,7 @@ pub enum FunctionGroup {
 ///
 /// - 0: The functions group type
 /// - 1: The functions bits set
-#[derive(Copy, Clone, Eq, PartialEq)]
+#[derive(Copy, Clone, Eq, Hash, PartialEq)]
 pub struct FunctionArg(u8, u8);
 
 impl FunctionArg {
@@ -1618,7 +1618,7 @@ impl Debug for FunctionArg {
 /// | x                 | 0                | 1           | 1           | service track reserved function |
 /// | x                 | 1                | 0           | 0           | no feedback                     |
 /// | x                 | 1                | 0           | 0           | feedback                        |
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, Hash, PartialEq)]
 pub struct Pcmd {
     /// Whether to write or if `false` read
     write: bool,
@@ -1762,7 +1762,7 @@ impl Pcmd {
 }
 
 /// Holding programming error flags
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, Hash, PartialEq)]
 pub struct PStat {
     /// User canceled operation
     user_aborted: bool,
@@ -1859,7 +1859,7 @@ impl PStat {
 }
 
 /// Holds control variables and data arguments.
-#[derive(Copy, Clone, Eq, PartialEq, Default)]
+#[derive(Copy, Clone, Eq, Hash, PartialEq, Default)]
 pub struct CvDataArg(u16, u8);
 
 impl CvDataArg {
@@ -1998,7 +1998,7 @@ impl Debug for CvDataArg {
 }
 
 /// Holding the clocks information
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, Hash, PartialEq)]
 pub struct FastClock {
     /// The clocks tick rate. (0 = Frozen), (x = x to 1 rate),
     clk_rate: u8,
@@ -2134,7 +2134,7 @@ impl FastClock {
 }
 
 /// The function bits accessible by the corresponding [ImArg]
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, Hash, PartialEq)]
 pub enum ImFunctionType {
     /// Functions 9 to 12 (inclusive) are accessible
     F9to12,
@@ -2145,7 +2145,7 @@ pub enum ImFunctionType {
 }
 
 /// The address in the right format used by the corresponding [ImArg]
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, Hash, PartialEq)]
 pub enum ImAddress {
     /// A short 8 bit address
     Short(u8),
@@ -2154,7 +2154,7 @@ pub enum ImAddress {
 }
 
 /// This arg hold function bit information
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, Hash, PartialEq)]
 pub struct ImArg {
     /// I don't get the concrete meaning and functionality of this arg
     dhi: u8,
@@ -2412,7 +2412,7 @@ impl ImArg {
 }
 
 /// Holds messages for writing data to slots
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, Hash, PartialEq)]
 pub enum WrSlDataStructure {
     /// Represents clock sync information
     ///
@@ -2565,7 +2565,7 @@ impl WrSlDataStructure {
 }
 
 /// Lissy IR reports status information
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, Hash, PartialEq)]
 pub struct LissyIrReport {
     arg1: u8,
     dir: bool,
@@ -2664,7 +2664,7 @@ impl LissyIrReport {
 }
 
 /// Holds report information of a rfid5 report message
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, Hash, PartialEq)]
 pub struct RFID5Report {
     arg1: u8,
     address: u16,
@@ -2818,7 +2818,7 @@ impl RFID5Report {
 }
 
 /// Holds report information of a rfid7 report message
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, Hash, PartialEq)]
 pub struct RFID7Report {
     arg1: u8,
     address: u16,
@@ -2995,7 +2995,7 @@ impl RFID7Report {
 }
 
 /// Holds wheel counter report information
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, Hash, PartialEq)]
 pub struct WheelcntReport {
     arg1: u8,
     unit: u16,
@@ -3093,7 +3093,7 @@ impl WheelcntReport {
 }
 
 /// Represents a report message
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, Hash, PartialEq)]
 pub enum RepStructure {
     /// A Lissy IR report
     LissyIrReport(LissyIrReport),
@@ -3137,7 +3137,7 @@ impl RepStructure {
 }
 
 /// The destination slot to move data to
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, Hash, PartialEq)]
 pub struct DstArg(u16);
 
 impl DstArg {
@@ -3184,7 +3184,7 @@ impl DstArg {
 }
 
 /// Holds eight movable bytes and peer data
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, Hash, PartialEq)]
 pub struct PxctData {
     pxc: u8,
     d1: u8,
@@ -3363,7 +3363,7 @@ impl PxctData {
 ///
 /// As I do not now how this message is structured this message bytes is for now open to use.
 /// Please feel free to contribute to provide a more powerful version of this arg
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, Hash, PartialEq)]
 pub struct ProgrammingAbortedArg {
     /// The count of args to write to the message 0x10 or 0x15
     pub arg_len: u8,
