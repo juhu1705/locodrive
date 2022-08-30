@@ -1,7 +1,7 @@
 /// Tests all testable core functions of this module
 #[cfg(test)]
 mod tests {
-    use crate::args::{Ack1Arg, AddressArg, Consist, CvDataArg, DecoderType, DirfArg, DstArg, FastClock, FunctionArg, FunctionGroup, IdArg, ImAddress, ImArg, ImFunctionType, InArg, LissyIrReport, LopcArg, MultiSenseArg, Pcmd, ProgrammingAbortedArg, PStat, PxctData, RepStructure, RFID5Report, RFID7Report, SensorLevel, SlotArg, SnArg, SndArg, SourceType, SpeedArg, Stat1Arg, Stat2Arg, State, SwitchArg, SwitchDirection, TrkArg, WheelcntReport, WrSlDataGeneral, WrSlDataPt, WrSlDataStructure, WrSlDataTime};
+    use crate::args::{Ack1Arg, AddressArg, Consist, CvDataArg, DecoderType, DirfArg, DstArg, FastClock, FunctionArg, FunctionGroup, IdArg, ImAddress, ImArg, ImFunctionType, InArg, LissyIrReport, LopcArg, MultiSenseArg, Pcmd, ProgrammingAbortedArg, PStat, PxctData, RepStructure, RFID5Report, RFID7Report, SensorLevel, SlotArg, SnArg, SndArg, SourceType, SpeedArg, Stat1Arg, Stat2Arg, State, SwitchArg, SwitchDirection, TrkArg, WheelcntReport, WrSlDataStructure};
     use crate::protocol::Message;
 
     /// Tests if the message parsing is reliable
@@ -38,36 +38,30 @@ mod tests {
         // Test messages of variable byte length
         test_one_message(Message::WrSlData(
             WrSlDataStructure::DataGeneral(
-                WrSlDataGeneral::new(
-                    SlotArg::new(12),
-                    Stat1Arg::new(false, Consist::Free, State::InUse, DecoderType::Dcc128),
-                    Stat2Arg::new(false, true, false),
-                    AddressArg::new(123),
-                    SpeedArg::Stop,
-                    DirfArg::new(false, true, false, false, false, false),
-                    TrkArg::new(true, false, true, true),
-                    SndArg::new(false, false, false, false),
-                    IdArg::new(12),
-                )
+                SlotArg::new(12),
+                Stat1Arg::new(false, Consist::Free, State::InUse, DecoderType::Dcc128),
+                Stat2Arg::new(false, true, false),
+                AddressArg::new(123),
+                SpeedArg::Stop,
+                DirfArg::new(false, true, false, false, false, false),
+                TrkArg::new(true, false, true, true),
+                SndArg::new(false, false, false, false),
+                IdArg::new(12),
             )
         ));
         test_one_message(Message::WrSlData(
             WrSlDataStructure::DataPt(
-                WrSlDataPt::new(
-                    Pcmd::new(false, true, false, false, false),
-                    AddressArg::new(64),
-                    TrkArg::new(true, true, true, true),
-                    *CvDataArg::new().set_data(1, true).set_cv(2, true),
-                )
+                Pcmd::new(false, true, false, false, false),
+                AddressArg::new(64),
+                TrkArg::new(true, true, true, true),
+                *CvDataArg::new().set_data(1, true).set_cv(2, true),
             )
         ));
         test_one_message(Message::WrSlData(
             WrSlDataStructure::DataTime(
-                WrSlDataTime::new(
-                    FastClock::new(12, 23, 2, 12, 22, 0x30),
-                    TrkArg::new(false, true, true, true),
-                    IdArg::new(123),
-                )
+                FastClock::new(12, 23, 2, 12, 22, 0x30),
+                TrkArg::new(false, true, true, true),
+                IdArg::new(123),
             )
         ));
         test_one_message(Message::SlRdData(

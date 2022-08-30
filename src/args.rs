@@ -2411,260 +2411,45 @@ impl ImArg {
     }
 }
 
-/// This holds all message information of to sync the devices clocks
+/// Holds messages for writing data to slots
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub struct WrSlDataTime(FastClock, TrkArg, IdArg);
-
-impl WrSlDataTime {
-    /// Creates new clock sync information
+pub enum WrSlDataStructure {
+    /// Represents clock sync information
     ///
     /// # Parameters
     ///
-    /// - `fast_clock`: The clock information
-    /// - `trk_arg`: The track
-    /// - `id_arg`: The id
-    pub fn new(fast_clock: FastClock, trk_arg: TrkArg, id_arg: IdArg) -> Self {
-        WrSlDataTime(fast_clock, trk_arg, id_arg)
-    }
-
-    pub(crate) fn parse(
-        clk_rate: u8,
-        frac_minsl: u8,
-        frac_minsh: u8,
-        mins: u8,
-        trk: u8,
-        hours: u8,
-        days: u8,
-        clk_cntr: u8,
-        id1: u8,
-        id2: u8,
-    ) -> Self {
-        WrSlDataTime(
-            FastClock::parse(
-                clk_rate, frac_minsl, frac_minsh, mins, hours, days, clk_cntr,
-            ),
-            TrkArg::parse(trk),
-            IdArg::parse(id1, id2),
-        )
-    }
-
-    /// # Returns
-    ///
-    /// The clock information for synchronising
-    pub fn fast_clock(&self) -> FastClock {
-        self.0
-    }
-
-    /// # Returns
-    ///
-    /// The systems track information
-    pub fn trk_arg(&self) -> TrkArg {
-        self.1
-    }
-
-    /// # Returns
-    ///
-    /// The id
-    pub fn id_arg(&self) -> IdArg {
-        self.2
-    }
-}
-
-/// Used for writing slot data to the programming track
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub struct WrSlDataPt(Pcmd, AddressArg, TrkArg, CvDataArg);
-
-impl WrSlDataPt {
+    /// - `FastClock`: The clock information
+    /// - `TrkArg`: The track
+    /// - `IdArg`: The ID of the slots user
+    DataTime(FastClock, TrkArg, IdArg),
     /// Creates new data to write to the programming track
     ///
     /// # Parameters
     ///
-    /// - `pcmd`: The programming command to use
-    /// - `opsa`: Operation mode programming bits as address
-    /// - `trk_arg`: The current track information to set
-    /// - `cv_data_arg`: The command value and data bits to programm
-    pub fn new(pcmd: Pcmd, opsa: AddressArg, trk_arg: TrkArg, cv_data_arg: CvDataArg) -> Self {
-        WrSlDataPt(pcmd, opsa, trk_arg, cv_data_arg)
-    }
-
-    /// Parses a new programming write argument from the 10 message bytes
+    /// - `Pcmd`: The programming command to use
+    /// - `AddressArg`: Operation mode programming bits as address
+    /// - `TrkArg`: The current track information to set
+    /// - `CvDataArg`: The command value and data bits to programm
+    DataPt(Pcmd, AddressArg, TrkArg, CvDataArg),
+    /// Represents a general message to write data to one specified slot
     ///
     /// # Parameters
     ///
-    /// - `pcmd`: The programming command byte
-    /// - `_arg3`: For programming unused arg
-    /// - `hopsa`: High part of the operation mode
-    /// - `lopsa`: Low part of the operation mode
-    /// - `trk`: The track information as one byte
-    /// - `cvh`: High part of the command values
-    /// - `cvl`: Low part of the command values
-    /// - `data7`: The data
-    /// - `_arg10`: For programming unused arg
-    /// - `_arg11`: For programming unused arg
-    fn parse(
-        pcmd: u8,
-        _arg3: u8,
-        hopsa: u8,
-        lopsa: u8,
-        trk: u8,
-        cvh: u8,
-        cvl: u8,
-        data7: u8,
-        _arg10: u8,
-        _arg11: u8,
-    ) -> Self {
-        WrSlDataPt(
-            Pcmd::parse(pcmd),
-            AddressArg::parse(hopsa, lopsa),
-            TrkArg::parse(trk),
-            CvDataArg::parse(cvh, cvl, data7),
-        )
-    }
-
-    /// # Returns
-    ///
-    /// The programming command to use
-    pub fn pcmd(&self) -> Pcmd {
-        self.0
-    }
-
-    /// # Returns
-    ///
-    /// The operation mode programming bits
-    pub fn opsa(&self) -> AddressArg {
-        self.1
-    }
-
-    /// # Returns
-    ///
-    /// The track information
-    pub fn trk_arg(&self) -> TrkArg {
-        self.2
-    }
-
-    /// # Returns
-    ///
-    /// The command values and data to write
-    pub fn cv_data_arg(&self) -> CvDataArg {
-        self.3
-    }
-}
-
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub struct WrSlDataGeneral(
-    SlotArg,
-    Stat1Arg,
-    Stat2Arg,
-    AddressArg,
-    SpeedArg,
-    DirfArg,
-    TrkArg,
-    SndArg,
-    IdArg,
-);
-
-impl WrSlDataGeneral {
-    pub fn new(
-        slot_arg: SlotArg,
-        stat1_arg: Stat1Arg,
-        stat2_arg: Stat2Arg,
-        address_arg: AddressArg,
-        speed_arg: SpeedArg,
-        dirf_arg: DirfArg,
-        trk_arg: TrkArg,
-        snd_arg: SndArg,
-        id_arg: IdArg,
-    ) -> Self {
-        WrSlDataGeneral(
-            slot_arg,
-            stat1_arg,
-            stat2_arg,
-            address_arg,
-            speed_arg,
-            dirf_arg,
-            trk_arg,
-            snd_arg,
-            id_arg,
-        )
-    }
-
-    pub fn parse(
-        slot: u8,
-        stat1: u8,
-        adr: u8,
-        spd: u8,
-        dirf: u8,
-        trk: u8,
-        stat2: u8,
-        adr2: u8,
-        snd: u8,
-        id1: u8,
-        id2: u8,
-    ) -> Self {
-        WrSlDataGeneral(
-            SlotArg::parse(slot),
-            Stat1Arg::parse(stat1),
-            Stat2Arg::parse(stat2),
-            AddressArg::parse(adr2, adr),
-            SpeedArg::parse(spd),
-            DirfArg::parse(dirf),
-            TrkArg::parse(trk),
-            SndArg::parse(snd),
-            IdArg::parse(id1, id2),
-        )
-    }
-
-    pub fn slot_arg(&self) -> SlotArg {
-        self.0
-    }
-
-    pub fn stat1_arg(&self) -> Stat1Arg {
-        self.1
-    }
-
-    pub fn stat2_arg(&self) -> Stat2Arg {
-        self.2
-    }
-
-    pub fn address_arg(&self) -> AddressArg {
-        self.3
-    }
-
-    pub fn speed_arg(&self) -> SpeedArg {
-        self.4
-    }
-
-    pub fn dirf_arg(&self) -> DirfArg {
-        self.5
-    }
-
-    pub fn trk_arg(&self) -> TrkArg {
-        self.6
-    }
-
-    pub fn snd_arg(&self) -> SndArg {
-        self.7
-    }
-
-    pub fn id_arg(&self) -> IdArg {
-        self.8
-    }
-
-    pub fn set_snd_arg(&mut self, snd_arg: SndArg) {
-        self.7 = snd_arg;
-    }
-}
-
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub enum WrSlDataStructure {
-    DataTime(WrSlDataTime),
-    /// Used for train programming
-    DataPt(WrSlDataPt),
-    DataGeneral(WrSlDataGeneral),
+    /// - `SlotArg`: The slot to write to
+    /// - `Stat1Arg`: The slots general status information
+    /// - `Stat2Arg`: Additional slot status information
+    /// - `AddressArg`: The slots corresponding address
+    /// - `SpeedArg`: The slots set speed
+    /// - `DirfArg`: The direction and low function bits
+    /// - `TrkArg`: The general track information
+    /// - `SndArg`: Additional function bits
+    /// - `IdArg`: The ID of the slots user
+    DataGeneral(SlotArg, Stat1Arg, Stat2Arg, AddressArg, SpeedArg, DirfArg, TrkArg, SndArg, IdArg),
 }
 
 impl WrSlDataStructure {
 
+    /// Parses eleven incoming bytes to one write slot data message
     pub(crate) fn parse(
         arg1: u8,
         arg2: u8,
@@ -2680,86 +2465,106 @@ impl WrSlDataStructure {
     ) -> Self {
         if arg1 == 0x7C {
             WrSlDataStructure::DataPt(
-                WrSlDataPt::parse(arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11)
+                Pcmd::parse(arg2),
+                AddressArg::parse(arg4, arg5),
+                TrkArg::parse(arg6),
+                CvDataArg::parse(arg7, arg8, arg9),
             )
         } else if arg1 == 0x7B {
             WrSlDataStructure::DataTime(
-                WrSlDataTime::parse(arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11)
+                FastClock::parse(
+                    arg2, arg3, arg4, arg5, arg7, arg8, arg9,
+                ),
+                TrkArg::parse(arg6),
+                IdArg::parse(arg10, arg11),
             )
         } else {
             WrSlDataStructure::DataGeneral(
-                WrSlDataGeneral::parse(
-                    arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11,
-                )
+                SlotArg::parse(arg1),
+                Stat1Arg::parse(arg2),
+                Stat2Arg::parse(arg7),
+                AddressArg::parse(arg8, arg3),
+                SpeedArg::parse(arg4),
+                DirfArg::parse(arg5),
+                TrkArg::parse(arg6),
+                SndArg::parse(arg9),
+                IdArg::parse(arg10, arg11),
             )
         }
     }
 
+    /// # Returns
+    ///
+    /// The slot this message is written to
     pub fn slot_type(&self) -> u8 {
         match self {
             WrSlDataStructure::DataPt(..) => 0x7C,
             WrSlDataStructure::DataTime(..) => 0x7B,
-            WrSlDataStructure::DataGeneral(data) => data.slot_arg().slot()
+            WrSlDataStructure::DataGeneral(slot, ..) => slot.slot()
         }
     }
 
+    /// # Returns
+    ///
+    /// This message as a sequence of 13 bytes
     pub(crate) fn to_message(self) -> Vec<u8> {
         match self {
-            WrSlDataStructure::DataPt(pt_slot) => {
+            WrSlDataStructure::DataPt(pcmd, adr, trk, cv_data) => {
                 vec![
                     0xEF,
                     0x0E,
                     0x7C,
-                    pt_slot.0.pcmd(),
+                    pcmd.pcmd(),
                     0x00,
-                    pt_slot.1.adr2(),
-                    pt_slot.1.adr1(),
-                    pt_slot.2.trk_arg(),
-                    pt_slot.3.cvh(),
-                    pt_slot.3.cvl(),
-                    pt_slot.3.data7(),
+                    adr.adr2(),
+                    adr.adr1(),
+                    trk.trk_arg(),
+                    cv_data.cvh(),
+                    cv_data.cvl(),
+                    cv_data.data7(),
                     0x00,
                     0x00,
                 ]
             },
-            WrSlDataStructure::DataTime(time_slot) => {
+            WrSlDataStructure::DataTime(fast_clock, trk, id) => {
                 vec![
                     0xEF,
                     0x0E,
                     0x7B,
-                    time_slot.0.clk_rate(),
-                    time_slot.0.frac_minsl(),
-                    time_slot.0.frac_minsh(),
-                    time_slot.0.mins(),
-                    time_slot.1.trk_arg(),
-                    time_slot.0.hours(),
-                    time_slot.0.days(),
-                    time_slot.0.clk_cntrl(),
-                    time_slot.2.id1(),
-                    time_slot.2.id2(),
+                    fast_clock.clk_rate(),
+                    fast_clock.frac_minsl(),
+                    fast_clock.frac_minsh(),
+                    fast_clock.mins(),
+                    trk.trk_arg(),
+                    fast_clock.hours(),
+                    fast_clock.days(),
+                    fast_clock.clk_cntrl(),
+                    id.id1(),
+                    id.id2(),
                 ]
             },
-            WrSlDataStructure::DataGeneral(general_slot) => {
+            WrSlDataStructure::DataGeneral(slot, stat1, stat2, adr, speed, dirf, trk, sound, id) => {
                 vec![
                     0xEF,
                     0x0E,
-                    general_slot.0.slot(),
-                    general_slot.1.stat1(),
-                    general_slot.3.adr1(),
-                    general_slot.4.spd(),
-                    general_slot.5.dirf(),
-                    general_slot.6.trk_arg(),
-                    general_slot.2.stat2(),
-                    general_slot.3.adr2(),
-                    general_slot.7.snd(),
-                    general_slot.8.id1(),
-                    general_slot.8.id2(),
+                    slot.slot(),
+                    stat1.stat1(),
+                    adr.adr1(),
+                    speed.spd(),
+                    dirf.dirf(),
+                    trk.trk_arg(),
+                    stat2.stat2(),
+                    adr.adr2(),
+                    sound.snd(),
+                    id.id1(),
+                    id.id2(),
                 ]
             }
         }
     }
 }
 
+/// Lissy IR reports status information
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct LissyIrReport {
     arg1: u8,
@@ -2769,6 +2574,13 @@ pub struct LissyIrReport {
 }
 
 impl LissyIrReport {
+    /// Creates a new report
+    ///
+    /// # Parameters
+    ///
+    /// - `dir`: The direction
+    /// - `unit`: The reports unit
+    /// - `address`: The reports address
     pub fn new(dir: bool, unit: u16, address: u16) -> Self {
         LissyIrReport {
             arg1: 0x00,
@@ -2778,14 +2590,22 @@ impl LissyIrReport {
         }
     }
 
-    fn parse(
+    /// Parses the report information from five bytes
+    ///
+    /// # Parameters
+    ///
+    /// - `arg1`: Specifies the report type
+    /// - `high_unit`: The most significant unit bits and the direction
+    /// - `low_unit`: The least significant unit bits
+    /// - `high_adr`: The most significant address bits
+    /// - `low_adr`: The least significant address bits
+    pub(crate) fn parse(
         arg1: u8,
         high_unit: u8,
         low_unit: u8,
         high_adr: u8,
         low_adr: u8,
     ) -> Self {
-
         let dir = high_unit & 0x40 == 0x40;
         let unit = (((high_unit & 0x3F) as u16) << 7) | (low_unit as u16);
         let address = (((high_adr & 0x7F) as u16) << 7) | (low_adr as u16);
@@ -2798,7 +2618,10 @@ impl LissyIrReport {
         }
     }
 
-    pub fn to_message(&self) -> Vec<u8> {
+    /// # Returns
+    ///
+    /// This message represented by a vector of seven bytes
+    pub(crate) fn to_message(self) -> Vec<u8> {
         let mut high_unit = ((self.unit >> 7) as u8) & 0x3F;
         if self.dir {
             high_unit |= 0x40;
@@ -2811,23 +2634,36 @@ impl LissyIrReport {
         ]
     }
 
+    /// # Returns
+    ///
+    /// The messages type byte
     pub fn arg1(&self) -> u8 {
         self.arg1
     }
 
+    /// # Returns
+    ///
+    /// The direction
     pub fn dir(&self) -> bool {
         self.dir
     }
 
+    /// # Returns
+    ///
+    /// The unit of this message
     pub fn unit(&self) -> u16 {
         self.unit
     }
 
+    /// # Returns
+    ///
+    /// The messages address
     pub fn address(&self) -> u16 {
         self.address
     }
 }
 
+/// Holds report information of a rfid5 report message
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct RFID5Report {
     arg1: u8,
@@ -2841,6 +2677,12 @@ pub struct RFID5Report {
 }
 
 impl RFID5Report {
+    /// Creates new report information
+    ///
+    /// # Parameters
+    ///
+    /// - `address`: The reporters address
+    /// - `rfid0` - `rfid4` and `rfid_hi`: The reported rfid values
     pub fn new(
         address: u16,
         rfid0: u8,
@@ -2862,7 +2704,15 @@ impl RFID5Report {
         }
     }
 
-    fn parse(
+    /// Parses this message from nine bytes
+    ///
+    /// # Parameters
+    ///
+    /// - `arg1`: This reports type byte
+    /// - `high_adr`: This most significant address part
+    /// - `low_adr`: This least significant address part
+    /// - `rfid0` - `rfid4` and `rfid_hi`: The reported rfid values
+    pub(crate) fn parse(
         arg1: u8,
         high_adr: u8,
         low_adr: u8,
@@ -2886,7 +2736,10 @@ impl RFID5Report {
         }
     }
 
-    pub fn to_message(&self) -> Vec<u8> {
+    /// # Returns
+    ///
+    /// This message parsed represented by 11 bytes
+    pub(crate) fn to_message(&self) -> Vec<u8> {
         let high_adr = ((self.address >> 7) as u8) & 0x7F;
         let low_adr = (self.address as u8) & 0x7F;
         vec![
@@ -2904,39 +2757,67 @@ impl RFID5Report {
         ]
     }
 
+    /// # Returns
+    ///
+    /// The messages type byte
     pub fn arg1(&self) -> u8 {
         self.arg1
     }
 
+    /// # Returns
+    ///
+    /// The reporters address
     pub fn address(&self) -> u16 {
         self.address
     }
 
+    /// # Returns
+    ///
+    /// The first reported rfid byte
     pub fn rfid0(&self) -> u8 {
         self.rfid0
     }
 
+    /// # Returns
+    ///
+    /// The second reported rfid byte
     pub fn rfid1(&self) -> u8 {
         self.rfid1
     }
 
+    /// # Returns
+    ///
+    /// The third reported rfid byte
     pub fn rfid2(&self) -> u8 {
         self.rfid2
     }
 
+
+    /// # Returns
+    ///
+    /// The fourth reported rfid byte
     pub fn rfid3(&self) -> u8 {
         self.rfid3
     }
 
+
+    /// # Returns
+    ///
+    /// The fifth reported rfid byte
     pub fn rfid4(&self) -> u8 {
         self.rfid4
     }
 
+
+    /// # Returns
+    ///
+    /// The last reported rfid byte
     pub fn rfid_hi(&self) -> u8 {
         self.rfid_hi
     }
 }
 
+/// Holds report information of a rfid7 report message
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct RFID7Report {
     arg1: u8,
@@ -2952,6 +2833,12 @@ pub struct RFID7Report {
 }
 
 impl RFID7Report {
+    /// Creates new report information
+    ///
+    /// # Parameters
+    ///
+    /// - `address`: The reporters address
+    /// - `rfid0` - `rfid6` and `rfid_hi`: The reported rfid values
     pub fn new(
         address: u16,
         rfid0: u8,
@@ -2977,7 +2864,15 @@ impl RFID7Report {
         }
     }
 
-    fn parse(
+    /// Parses this message from eleven bytes
+    ///
+    /// # Parameters
+    ///
+    /// - `arg1`: This reports type byte
+    /// - `high_adr`: This most significant address part
+    /// - `low_adr`: This least significant address part
+    /// - `rfid0` - `rfid6` and `rfid_hi`: The reported rfid values
+    pub(crate) fn parse(
         arg1: u8,
         high_adr: u8,
         low_adr: u8,
@@ -3005,7 +2900,10 @@ impl RFID7Report {
         }
     }
 
-    pub fn to_message(&self) -> Vec<u8> {
+    /// # Returns
+    ///
+    /// This message represented by 13 bytes
+    pub(crate) fn to_message(&self) -> Vec<u8> {
         let high_adr = ((self.address >> 7) as u8) & 0x7F;
         let low_adr = (self.address as u8) & 0x7F;
         vec![
@@ -3025,47 +2923,78 @@ impl RFID7Report {
         ]
     }
 
+    /// # Returns
+    ///
+    /// The messages type byte
     pub fn arg1(&self) -> u8 {
         self.arg1
     }
 
+    /// # Returns
+    ///
+    /// The reporters address
     pub fn address(&self) -> u16 {
         self.address
     }
 
+    /// # Returns
+    ///
+    /// The first reported rfid byte
     pub fn rfid0(&self) -> u8 {
         self.rfid0
     }
 
+    /// # Returns
+    ///
+    /// The second reported rfid byte
     pub fn rfid1(&self) -> u8 {
         self.rfid1
     }
 
+    /// # Returns
+    ///
+    /// The third reported rfid byte
     pub fn rfid2(&self) -> u8 {
         self.rfid2
     }
 
+    /// # Returns
+    ///
+    /// The fourth reported rfid byte
     pub fn rfid3(&self) -> u8 {
         self.rfid3
     }
 
+    /// # Returns
+    ///
+    /// The fifth reported rfid byte
     pub fn rfid4(&self) -> u8 {
         self.rfid4
     }
 
+    /// # Returns
+    ///
+    /// The sixth reported rfid byte
     pub fn rfid5(&self) -> u8 {
         self.rfid5
     }
 
+    /// # Returns
+    ///
+    /// The seventh reported rfid byte
     pub fn rfid6(&self) -> u8 {
         self.rfid6
     }
 
+    /// # Returns
+    ///
+    /// The last reported rfid byte
     pub fn rfid_hi(&self) -> u8 {
         self.rfid_hi
     }
 }
 
+/// Holds wheel counter report information
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct WheelcntReport {
     arg1: u8,
@@ -3075,6 +3004,13 @@ pub struct WheelcntReport {
 }
 
 impl WheelcntReport {
+    /// Creates new wheel counter report information
+    ///
+    /// # Parameters
+    ///
+    /// - `unit`: The reports unit
+    /// - `direction`: The reports direction
+    /// - `count`: The reports wheel count
     pub fn new(unit: u16, direction: bool, count: u16) -> Self {
         WheelcntReport {
             arg1: 0x40,
@@ -3084,7 +3020,16 @@ impl WheelcntReport {
         }
     }
 
-    fn parse(
+    /// Parses the wheel count information from five bytes
+    ///
+    /// # Parameters
+    ///
+    /// - `arg1`: The reports type byte
+    /// - `high_unit`: The most significant unit bits and the direction
+    /// - `low_unit`: The least significant unit bits
+    /// - `high_count`: The most significant count bits
+    /// - `low_count`: The least significant count bits
+    pub(crate) fn parse(
         arg1: u8,
         high_unit: u8,
         low_unit: u8,
@@ -3102,7 +3047,10 @@ impl WheelcntReport {
         }
     }
 
-    pub fn to_message(&self) -> Vec<u8> {
+    /// # Returns
+    ///
+    /// This message represented by seven bytes
+    pub(crate) fn to_message(&self) -> Vec<u8> {
         let mut high_unit = ((self.unit >> 7) as u8) & 0x3F;
         if self.direction {
             high_unit |= 0x40;
@@ -3115,49 +3063,56 @@ impl WheelcntReport {
         ]
     }
 
+    /// # Returns
+    ///
+    /// This reports type byte
     pub fn arg1(&self) -> u8 {
         self.arg1
     }
 
+    /// # Returns
+    ///
+    /// The unit of this report
     pub fn unit(&self) -> u16 {
         self.unit
     }
 
+    /// # Returns
+    ///
+    /// The count hold by this message
     pub fn count(&self) -> u16 {
         self.count
     }
 
+    /// # Returns
+    ///
+    /// This messages direction
     pub fn direction(&self) -> bool {
         self.direction
     }
 }
 
+/// Represents a report message
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum RepStructure {
+    /// A Lissy IR report
     LissyIrReport(LissyIrReport),
+    /// A rfid5 report
     RFID5Report(RFID5Report),
+    /// A rfid7 report
     RFID7Report(RFID7Report),
+    /// A wheel count report
     WheelcntReport(WheelcntReport),
 }
 
 impl RepStructure {
-    pub fn new_lissy_ir(rep: LissyIrReport) -> Self {
-        RepStructure::LissyIrReport(rep)
-    }
-
-    pub fn new_rfid_5(rep: RFID5Report) -> Self {
-        RepStructure::RFID5Report(rep)
-    }
-
-    pub fn new_rfid_7(rep: RFID7Report) -> Self {
-        RepStructure::RFID7Report(rep)
-    }
-
-    pub fn new_wheelcnt(rep: WheelcntReport) -> Self {
-        RepStructure::WheelcntReport(rep)
-    }
-
-    pub fn parse(count: u8, args: &[u8]) -> Result<Self, MessageParseError> {
+    /// Parses a report message from the given bytes
+    ///
+    /// # Parameters
+    ///
+    /// - `count`: The messages length
+    /// - `args`: The messages arguments to parse
+    pub(crate) fn parse(count: u8, args: &[u8]) -> Result<Self, MessageParseError> {
         if args[0] == 0x00 {
             Ok(Self::LissyIrReport(LissyIrReport::parse(
                 args[0], args[1], args[2], args[3], args[4],
@@ -3181,32 +3136,54 @@ impl RepStructure {
     }
 }
 
+/// The destination slot to move data to
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct DstArg(u16);
 
 impl DstArg {
+    /// Creates a new destination slot
+    ///
+    /// # Parameters
+    ///
+    /// - `dst`: The destination
     pub fn new(dst: u16) -> Self {
         DstArg(dst)
     }
 
-    pub fn parse(dst_low: u8, dst_high: u8) -> Self {
+    /// Parses the destination from two bytes
+    ///
+    /// # Parameters
+    ///
+    /// - `dst_low`: The seven least significant destination address bytes
+    /// - `dst_high`: The seven most significant destination address bytes
+    pub(crate) fn parse(dst_low: u8, dst_high: u8) -> Self {
         let dst = ((dst_high as u16) << 7) | (dst_low as u16);
         DstArg(dst)
     }
 
+    /// # Returns
+    ///
+    /// The destination address of the slot move
     pub fn dst(&self) -> u16 {
         self.0
     }
 
-    pub fn dst_low(&self) -> u8 {
+    /// # Returns
+    ///
+    /// The seven least significant destination address bits
+    pub(crate) fn dst_low(&self) -> u8 {
         self.0 as u8 & 0x7F
     }
 
-    pub fn dst_high(&self) -> u8 {
+    /// # Returns
+    ///
+    /// The seven most significant destination address bits
+    pub(crate) fn dst_high(&self) -> u8 {
         (self.0 >> 7) as u8 & 0x7F
     }
 }
 
+/// Holds eight movable bytes and peer data
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct PxctData {
     pxc: u8,
@@ -3221,6 +3198,12 @@ pub struct PxctData {
 }
 
 impl PxctData {
+    /// Creates new peer data
+    ///
+    /// # Parameters
+    ///
+    /// - `pxc`: The peer data
+    /// - `d1` - `d8`: The data
     pub fn new(pxc: u8, d1: u8, d2: u8, d3: u8, d4: u8, d5: u8, d6: u8, d7: u8, d8: u8) -> Self {
         PxctData {
             pxc,
@@ -3235,7 +3218,13 @@ impl PxctData {
         }
     }
 
-    pub fn parse(
+    /// Parses the data from 10 bytes
+    ///
+    /// # Parameters
+    ///
+    /// - `pxct1`, `pxct2`: The peer data
+    /// - `d1` - `d8`: The data
+    pub(crate) fn parse(
         pxct1: u8,
         d1: u8,
         d2: u8,
@@ -3262,11 +3251,17 @@ impl PxctData {
         }
     }
 
+    /// # Returns
+    ///
+    /// The peer data
     pub fn pxc(&self) -> u8 {
         self.pxc
     }
 
-    pub fn pxct1(&self) -> u8 {
+    /// # Returns
+    ///
+    /// The low part of the peer data and one data bit of the first four the data bits
+    pub(crate) fn pxct1(&self) -> u8 {
         let mut pxct1 = (self.pxc & 0x07) << 4;
 
         if self.d1 & 0x40 == 0x40 {
@@ -3285,7 +3280,10 @@ impl PxctData {
         pxct1
     }
 
-    pub fn pxct2(&self) -> u8 {
+    /// # Returns
+    ///
+    /// The high part of the peer data and one data bit of the last four the data bits
+    pub(crate) fn pxct2(&self) -> u8 {
         let mut pxct2 = (self.pxc & 0x78) << 1;
 
         if self.d5 & 0x40 == 0x40 {
@@ -3304,67 +3302,126 @@ impl PxctData {
         pxct2
     }
 
+    /// # Returns
+    ///
+    /// The first data byte to move
     pub fn d1(&self) -> u8 {
         self.d1 & 0x3F
     }
 
+    /// # Returns
+    ///
+    /// The second data byte to move
     pub fn d2(&self) -> u8 {
         self.d2 & 0x3F
     }
 
+    /// # Returns
+    ///
+    /// The third data byte to move
     pub fn d3(&self) -> u8 {
         self.d3 & 0x3F
     }
 
+    /// # Returns
+    ///
+    /// The fourth data byte to move
     pub fn d4(&self) -> u8 {
         self.d4 & 0x3F
     }
 
+    /// # Returns
+    ///
+    /// The fifth data byte to move
     pub fn d5(&self) -> u8 {
         self.d5 & 0x3F
     }
 
+    /// # Returns
+    ///
+    /// The sixth data byte to move
     pub fn d6(&self) -> u8 {
         self.d6 & 0x3F
     }
 
+    /// # Returns
+    ///
+    /// The seventh data byte to move
     pub fn d7(&self) -> u8 {
         self.d7 & 0x3F
     }
 
+    /// # Returns
+    ///
+    /// The eighth data byte to move
     pub fn d8(&self) -> u8 {
         self.d8 & 0x3F
     }
 }
 
+/// Send when service mode is aborted
+///
+/// As I do not now how this message is structured this message bytes is for now open to use.
+/// Please feel free to contribute to provide a more powerful version of this arg
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct ProgrammingAbortedArg {
+    /// The count of args to write to the message 0x10 or 0x15
     pub arg_len: u8,
+    /// The first argument
     pub arg1: u8,
+    /// The second argument
     pub arg2: u8,
+    /// The third argument
     pub arg3: u8,
+    /// The fourth argument
     pub arg4: u8,
+    /// The fifth argument
     pub arg5: u8,
+    /// The sixth argument
     pub arg6: u8,
+    /// The seventh argument
     pub arg7: u8,
+    /// The eighth argument
     pub arg8: u8,
+    /// The ninth argument
     pub arg9: u8,
+    /// The tenth argument
     pub arg10: u8,
+    /// The eleventh argument
     pub arg11: u8,
+    /// The twelfth argument
     pub arg12: u8,
+    /// The thirteenth argument
     pub arg13: u8,
+    /// The fourteenth argument
     pub arg14: u8,
+    /// The fifteenth argument
     pub arg15: u8,
+    /// The sixteenth argument
     pub arg16: u8,
+    /// The seventeenth argument
     pub arg17: u8,
+    /// The eighteenth argument
     pub arg18: u8,
 }
 
 impl ProgrammingAbortedArg {
+    /// Creates a new service mode aborted message.
+    ///
+    /// # Parameters
+    ///
+    /// - `len`: The messages length (0x10 or 0x15)
+    /// - `args`: The argument values. 0x10 = 0 - 12 filled, 0x15 = 0 - 17 filled
     pub fn new(len: u8, args: &[u8]) -> Self {
         ProgrammingAbortedArg::parse(len, args)
     }
 
+    /// Parses a new service mode aborted message.
+    ///
+    /// # Parameters
+    ///
+    /// - `len`: The messages length (0x10 or 0x15)
+    /// - `args`: The argument values. 0x10 = 0 - 12 filled, 0x15 = 0 - 17 filled
     pub(crate) fn parse(len: u8, args: &[u8]) -> Self {
         match len {
             0x10 => {
@@ -3416,6 +3473,9 @@ impl ProgrammingAbortedArg {
         }
     }
 
+    /// # Returns
+    ///
+    /// This message as a count of bytes
     pub(crate) fn to_message(self) -> Vec<u8> {
         match self.arg_len {
             0x10 => vec![
