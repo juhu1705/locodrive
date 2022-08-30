@@ -2739,7 +2739,7 @@ impl RFID5Report {
     /// # Returns
     ///
     /// This message parsed represented by 11 bytes
-    pub(crate) fn to_message(&self) -> Vec<u8> {
+    pub(crate) fn to_message(self) -> Vec<u8> {
         let high_adr = ((self.address >> 7) as u8) & 0x7F;
         let low_adr = (self.address as u8) & 0x7F;
         vec![
@@ -2903,7 +2903,7 @@ impl RFID7Report {
     /// # Returns
     ///
     /// This message represented by 13 bytes
-    pub(crate) fn to_message(&self) -> Vec<u8> {
+    pub(crate) fn to_message(self) -> Vec<u8> {
         let high_adr = ((self.address >> 7) as u8) & 0x7F;
         let low_adr = (self.address as u8) & 0x7F;
         vec![
@@ -3050,7 +3050,7 @@ impl WheelcntReport {
     /// # Returns
     ///
     /// This message represented by seven bytes
-    pub(crate) fn to_message(&self) -> Vec<u8> {
+    pub(crate) fn to_message(self) -> Vec<u8> {
         let mut high_unit = ((self.unit >> 7) as u8) & 0x3F;
         if self.direction {
             high_unit |= 0x40;

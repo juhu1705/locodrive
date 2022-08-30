@@ -4,7 +4,7 @@ use crate::protocol::Message;
 use std::sync::{Arc, Condvar, Mutex};
 use std::time::Duration;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::sync::mpsc::Sender;
+use tokio::sync::broadcast::Sender;
 use tokio::task::JoinHandle;
 use tokio::sync::Notify;
 use tokio_serial::{DataBits, Error, FlowControl, Parity, SerialPort, SerialPortBuilderExt, SerialStream, StopBits};
@@ -55,7 +55,7 @@ type ReferencedSendSynchronisation<'a> = Arc<(&'a Arc<Mutex<Vec<u8>>>, &'a Arc<C
 /// #[tokio::main]
 /// async fn main() {
 ///     // Creating a sender and receiver for the LocoDriveConnector.
-///     let (sender, mut receiver) = tokio::sync::mpsc::channel(1);
+///     let (sender, mut receiver) = tokio::sync::broadcast::channel(1);
 ///
 ///     // Creating a LocoDriveConnector, reading from the port '/dev/ttyUSB0'.
 ///     let mut loco_controller = match LocoDriveController::new(
@@ -64,6 +64,7 @@ type ReferencedSendSynchronisation<'a> = Arc<(&'a Arc<Mutex<Vec<u8>>>, &'a Arc<C
 ///         5000,
 ///         FlowControl::Software,
 ///         sender,
+///         false,
 ///     ).await {
 ///         Ok(loco_controller) => loco_controller,
 ///         Err(err) => {
@@ -75,7 +76,7 @@ type ReferencedSendSynchronisation<'a> = Arc<(&'a Arc<Mutex<Vec<u8>>>, &'a Arc<C
 ///     loco_controller.send_message(LocoSpd(SlotArg::new(3), SpeedArg::Stop));
 ///
 ///     let mut read_messages = 0;
-///     while let Some(message) = receiver.recv().await {
+///     while let Ok(message) = receiver.recv().await {
 ///         println!("GOT = {:?}", message);
 ///         read_messages += 1;
 ///         if read_messages >= 10 {
@@ -134,6 +135,7 @@ impl LocoDriveController {
         sending_timeout: u64,
         flow_control: FlowControl,
         send_to: Sender<LocoDriveMessage>,
+        ignore_send_messages: bool,
     ) -> Result<Self, Error> {
         // Creation of the port to write to
         let mut port = match tokio_serial::new(port_name, baud_rate)
@@ -173,6 +175,7 @@ impl LocoDriveController {
             &send_to,
             &stop,
             &fire_stop,
+            ignore_send_messages
         ).await);
 
         // All steps has passed successfully
@@ -258,6 +261,7 @@ impl LocoDriveController {
     /// # Returns
     ///
     /// The spawned threads join handle.
+    #[allow(clippy::too_many_arguments)]
     async fn start_reading_thread(
         port_name: String,
         baud_rate: u32,
@@ -266,6 +270,7 @@ impl LocoDriveController {
         send_to: &Sender<LocoDriveMessage>,
         wait_to: &Arc<Mutex<bool>>,
         stopping: &Arc<Notify>,
+        ignore_send_messages: bool,
     ) -> JoinHandle<()> {
         // Clone all arcs to make them save to use in the reading thread
         let arc_send_to = send_to.clone();
@@ -292,7 +297,7 @@ impl LocoDriveController {
             {
                 Ok(port) => port,
                 Err(err) => {
-                    if let Err(err) = arc_send_to.send(LocoDriveMessage::SerialPortError(err)).await {
+                    if let Err(err) = arc_send_to.send(LocoDriveMessage::SerialPortError(err)) {
                         eprintln!("[locodrive:ERROR] Unable to send critical error to receiver! \
                         Closed connection to the serial port!\n \
                         Following error occurred: {:?}", err);
@@ -304,7 +309,7 @@ impl LocoDriveController {
             // For linux systems we once more ensure that this set is not exclusive usable for us
             #[cfg(unix)]
             if let Err(err) = port.set_exclusive(false) {
-                if let Err(err) = arc_send_to.send(LocoDriveMessage::SerialPortError(err)).await {
+                if let Err(err) = arc_send_to.send(LocoDriveMessage::SerialPortError(err)) {
                     eprintln!("[locodrive:ERROR] Unable to send critical error to receiver! \
                     Closed connection to the serial port!\n \
                     Following error occurred: {:?}", err);
@@ -332,6 +337,7 @@ impl LocoDriveController {
                     &mut last_message,
                     &arc_send_to,
                     &new_arc_stopping,
+                    ignore_send_messages
                 )
                 .await;
             }
@@ -357,9 +363,10 @@ impl LocoDriveController {
         last_message: &mut Message,
         send_to: &Sender<LocoDriveMessage>,
         stopping: &Arc<Notify>,
+        ignore_send_messages: bool,
     ) {
         // We read the next message from the serial port
-        let parsed = LocoDriveController::read_next_message(port, send, stopping).await;
+        let parsed = LocoDriveController::read_next_message(port, send, stopping, ignore_send_messages).await;
 
         // We check which type the message we received is
         match parsed {
@@ -367,7 +374,7 @@ impl LocoDriveController {
             Err(MessageParseError::Update) => {}
             // For errors we only give them to our listener and if this fails we print them
             Err(err) => {
-                if let Err(err) = send_to.send(LocoDriveMessage::Error(err)).await {
+                if let Err(err) = send_to.send(LocoDriveMessage::Error(err)) {
                     eprintln!("[locodrive:ERROR] {:?}", err);
                 };
                 *await_response = false;
@@ -382,7 +389,7 @@ impl LocoDriveController {
                                 // We notify our listener of that long acknowledgment
                                 if let Err(err) = send_to.send(
                                     LocoDriveMessage::Answer(message, *last_message)
-                                ).await {
+                                ) {
                                     eprintln!("[locodrive:ERROR] {:?}", err);
                                 };
                             }
@@ -391,7 +398,7 @@ impl LocoDriveController {
                             if last_message.await_slot_data() {
                                 if let Err(err) = send_to.send(
                                     LocoDriveMessage::Answer(message, *last_message)
-                                ).await {
+                                ) {
                                     eprintln!("[locodrive:ERROR] {:?}", err);
                                 };
                             }
@@ -409,7 +416,7 @@ impl LocoDriveController {
                 }
 
                 // We at least notify our listener about the received message
-                if let Err(err) = send_to.send(LocoDriveMessage::Message(message)).await {
+                if let Err(err) = send_to.send(LocoDriveMessage::Message(message)) {
                     eprintln!("[locodrive:ERROR] {:?}", err);
                 }
             }
@@ -437,6 +444,7 @@ impl LocoDriveController {
         port: &mut SerialStream,
         send: &ReferencedSendSynchronisation<'a>,
         stopping: &Arc<Notify>,
+        ignore_send_messages: bool,
     ) -> Result<Message, MessageParseError> {
         // The buffer we want to read the model railroads message to
         let mut buf = vec![0u8; 1];
@@ -490,6 +498,10 @@ impl LocoDriveController {
             *last_send = vec![0u8; 0];
             waiter.notify_all();
             cvar.notify_one();
+
+            if ignore_send_messages {
+                return Err(MessageParseError::Update)
+            }
         }
 
         // We now parse the read bytes to our message
