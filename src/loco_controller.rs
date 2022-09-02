@@ -2,7 +2,7 @@ use std::fmt::Debug;
 use crate::error::{LocoDriveSendingError, MessageParseError};
 use crate::protocol::Message;
 use std::sync::{Arc, Condvar, Mutex};
-use std::time::Duration;
+use tokio::time::{sleep, Duration};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::sync::broadcast::Sender;
 use tokio::task::JoinHandle;
@@ -26,8 +26,8 @@ pub enum LocoDriveMessage {
     SerialPortError(Error),
 }
 
-type SendSynchronisation = Arc<(Arc<Mutex<Vec<u8>>>, Arc<Condvar>, Arc<Condvar>)>;
-type ReferencedSendSynchronisation<'a> = Arc<(&'a Arc<Mutex<Vec<u8>>>, &'a Arc<Condvar>, &'a Arc<Condvar>)>;
+type SendSynchronisation = Arc<(Arc<Mutex<Vec<u8>>>, Arc<Notify>)>;
+type ReferencedSendSynchronisation<'a> = Arc<(&'a Arc<Mutex<Vec<u8>>>, &'a Arc<Notify>)>;
 
 /// This struct handles a connection to a serial port based railroad controlling system.
 ///
@@ -100,6 +100,8 @@ pub struct LocoDriveController {
     reading_thread: Option<JoinHandle<()>>,
     /// How long to wait on success of sending.
     sending_timeout: u64,
+    /// Securing one writing thread at a time
+    wait_for_write: Arc<tokio::sync::Mutex<bool>>,
 }
 
 impl LocoDriveController {
@@ -158,8 +160,7 @@ impl LocoDriveController {
         // Takes care of the writer reader synchronisation
         let send = Arc::new((
             Arc::new(Mutex::new(vec![0u8; 0])),
-            Arc::new(Condvar::new()),
-            Arc::new(Condvar::new()),
+            Arc::new(Notify::new()),
         ));
 
         // Used to stop a reader when the the value was dropped
@@ -178,6 +179,8 @@ impl LocoDriveController {
             ignore_send_messages
         ).await);
 
+        let wait_for_write = Arc::new(tokio::sync::Mutex::new(false));
+
         // All steps has passed successfully
         Ok(LocoDriveController {
             port,
@@ -185,7 +188,8 @@ impl LocoDriveController {
             stop,
             fire_stop,
             reading_thread,
-            sending_timeout
+            sending_timeout,
+            wait_for_write,
         })
     }
 
@@ -277,11 +281,9 @@ impl LocoDriveController {
 
         let last_message = &send.0;
         let notify_wait = &send.1;
-        let notify_received = &send.2;
 
         let last_message_move = last_message.clone();
         let notify_wait_move = notify_wait.clone();
-        let notify_received_move = notify_received.clone();
 
         let new_arc_wait_to = wait_to.clone();
         let new_arc_stopping = stopping.clone();
@@ -323,7 +325,7 @@ impl LocoDriveController {
             let mut last_message = Message::Busy;
 
             let new_arc_send_locked =
-                Arc::new((&last_message_move, &notify_wait_move, &notify_received_move));
+                Arc::new((&last_message_move, &notify_wait_move));
 
             println!("[locodrive:INFO] Reading thread started!");
 
@@ -491,13 +493,12 @@ impl LocoDriveController {
         });
 
         // Check for receiving last send message to awake the writing thread
-        let (lock, cvar, waiter) = **send;
+        let (lock, cvar) = **send;
         let mut last_send = lock.lock().unwrap();
 
         if !(*last_send).is_empty() && (*last_send) == buf {
             *last_send = vec![0u8; 0];
-            waiter.notify_all();
-            cvar.notify_one();
+            cvar.notify_waiters();
 
             if ignore_send_messages {
                 return Err(MessageParseError::Update)
@@ -524,24 +525,13 @@ impl LocoDriveController {
             return Err(LocoDriveSendingError::IllegalState)
         }
 
+        let _send_message_waiting = self.wait_for_write.lock().await;
+
         // We parse the message to send in a byte vector
         let bytes = message.to_message();
 
         // We wait for possible other waiting operations to finish
-        let (lock, cvar, waiter) = &*self.send;
-
-        if !(*lock.lock().unwrap()).is_empty() {
-            let result = cvar
-                .wait_timeout_while(
-                    lock.lock().unwrap(),
-                    Duration::from_millis(self.sending_timeout),
-                    |pending| !(*pending).is_empty(),
-                ).unwrap();
-
-            if result.1.timed_out() {
-                return Err(LocoDriveSendingError::Timeout);
-            }
-        }
+        let (lock, notify) = &*self.send;
 
         {
             // We say the Reader which method to expect
@@ -556,15 +546,11 @@ impl LocoDriveController {
                 // When successfully written, wait until the positive response
                 // by the reading thread is received or raise an error
                 if !(*lock.lock().unwrap()).is_empty() {
-                    let result = waiter
-                        .wait_timeout_while(
-                            lock.lock().unwrap(),
-                            Duration::from_millis(self.sending_timeout),
-                            |pending| !(*pending).is_empty(),
-                        )
-                        .unwrap();
-                    if result.1.timed_out() {
-                        return Err(LocoDriveSendingError::Timeout);
+                    if tokio::select! {
+                        _ = notify.notified() => false,
+                        _ = sleep(Duration::from_millis(self.sending_timeout)) => true,
+                    } {
+                        return Err(LocoDriveSendingError::Timeout)
                     }
                 }
                 Ok(())

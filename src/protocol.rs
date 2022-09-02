@@ -3,7 +3,7 @@ use crate::error::MessageParseError;
 
 /// Represents the types of messages that are specified by the model railroads protocol.
 #[repr(u8)]
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
 pub enum Message {
     /// Forces the model railroads to switch in Idle state. An emergency stop for all trains is broadcast.
     /// Note: The model railroads may not response any more.
