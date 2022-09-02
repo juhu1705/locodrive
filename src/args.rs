@@ -71,9 +71,10 @@ pub enum SwitchDirection {
 pub struct SwitchArg {
     /// The address of the switch (0 - 2047)
     address: u16,
-    /// The switches direction state
+    /// The switches direction state, which direction the switch points
     direction: SwitchDirection,
-    /// The activation state of the switch (`true = ON, false = OFF`)
+    /// If the switch is not in the requested direction.
+    /// Use true if you want the switch to go to the direction.
     state: bool,
 }
 
@@ -85,7 +86,7 @@ impl SwitchArg {
     ///
     /// - `address`: The address of the switch you want to change state (0 to 2047)
     /// - `direction`: The direction the switch should switch to
-    /// - `state`: The activation state of the switch (`true = ON`, `false = OFF`)
+    /// - `state`: The activation state of the switch (If the switch is in the requested state)
     pub fn new(address: u16, direction: SwitchDirection, state: bool) -> Self {
         Self {
             address,
@@ -134,7 +135,7 @@ impl SwitchArg {
     }
     /// # Returns
     ///
-    /// The switches activation status (`true = ON, false = OFF`)
+    /// The switches activation status. False if the switch has switched to the requested state.
     pub fn state(&self) -> bool {
         self.state
     }

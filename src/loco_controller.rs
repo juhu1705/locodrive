@@ -1,9 +1,10 @@
 use std::fmt::Debug;
 use crate::error::{LocoDriveSendingError, MessageParseError};
 use crate::protocol::Message;
-use std::sync::{Arc, Condvar, Mutex};
+use std::sync::{Arc, Mutex};
 use tokio::time::{sleep, Duration};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::runtime::Runtime;
 use tokio::sync::broadcast::Sender;
 use tokio::task::JoinHandle;
 use tokio::sync::Notify;
@@ -370,6 +371,8 @@ impl LocoDriveController {
         // We read the next message from the serial port
         let parsed = LocoDriveController::read_next_message(port, send, stopping, ignore_send_messages).await;
 
+        println!("Read: {:?}", parsed);
+
         // We check which type the message we received is
         match parsed {
             // We can at this level ignore update messages
@@ -570,7 +573,7 @@ impl Drop for LocoDriveController {
     ///
     /// The drop panics if the reading thread has panicked.
     fn drop(&mut self) {
-        let runtime = match tokio::runtime::Runtime::new() {
+        let runtime = match Runtime::new() {
             Ok(runtime) => runtime,
             Err(_) => { return; }
         };
