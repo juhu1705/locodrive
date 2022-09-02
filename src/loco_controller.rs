@@ -2,6 +2,7 @@ use std::fmt::Debug;
 use crate::error::{LocoDriveSendingError, MessageParseError};
 use crate::protocol::Message;
 use std::sync::{Arc, Mutex};
+use std::thread::{spawn};
 use tokio::time::{sleep, Duration};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::runtime::Runtime;
@@ -237,13 +238,25 @@ impl LocoDriveController {
     ///
     /// This function panics if the reading thread has panicked or the reading thread was killed,
     /// by some external source.
-    async fn stop_reader(&mut self) {
+    fn stop_reader(&mut self) {
         if let Some(reader) = self.reading_thread.take() {
             // Note the thread to end reading
             *self.stop.lock().unwrap() = true;
             self.fire_stop.notify_waiters();
             // Wait until the thread is stopped
-            reader.await.unwrap();
+            match spawn(move || {
+                let runtime = match Runtime::new() {
+                    Ok(runtime) => runtime,
+                    Err(_) => { return; }
+                };
+                match runtime.block_on(reader) {
+                    Ok(_) => "",
+                    Err(_) => "",
+                };
+            }).join() {
+                Ok(_) => "",
+                Err(_) => "",
+            };
 
             // We allow new threads to spawn and read from the port
             *self.stop.lock().unwrap() = false;
@@ -553,10 +566,13 @@ impl LocoDriveController {
                         _ = notify.notified() => false,
                         _ = sleep(Duration::from_millis(self.sending_timeout)) => true,
                     } {
-                        return Err(LocoDriveSendingError::Timeout)
+                        Err(LocoDriveSendingError::Timeout)
+                    } else {
+                        Ok(())
                     }
+                } else {
+                    Ok(())
                 }
-                Ok(())
             }
             Err(_) => Err(LocoDriveSendingError::NotWritable),
         }
@@ -573,10 +589,6 @@ impl Drop for LocoDriveController {
     ///
     /// The drop panics if the reading thread has panicked.
     fn drop(&mut self) {
-        let runtime = match Runtime::new() {
-            Ok(runtime) => runtime,
-            Err(_) => { return; }
-        };
-        runtime.block_on(self.stop_reader());
+        self.stop_reader()
     }
 }
