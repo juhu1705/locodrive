@@ -167,8 +167,8 @@ mod tests {
         let mut loco_controller = match LocoDriveController::new(
             "/dev/ttyUSB0",
             115_200,
-            5000,
-            FlowControl::Software,
+            50000,
+            FlowControl::None,
             sender,
             false,
         ).await {
@@ -179,6 +179,12 @@ mod tests {
                 return;
             }
         };
+
+        let _m = Message::parse(
+            Message::SwReq(SwitchArg::new(15, SwitchDirection::Curved, true)).to_message().as_slice()
+        ).unwrap();
+
+        println!("Message: {:?}", Message::SwReq(SwitchArg::new(15, SwitchDirection::Curved, true)).to_message());
 
         loco_controller.send_message(GpOn).await.unwrap();
 
@@ -229,15 +235,15 @@ mod tests {
 
         println!("Known Trains: {:?}", slot_adr_map);
 
-        for i in 1..11 {
+        for i in 1..3 {
             println!("Drive round {}", i);
 
             if i % 2 == 0 {
-                loco_controller.send_message(Message::SwReq(SwitchArg::new(8, SwitchDirection::Straight, true))).await.unwrap();
-                loco_controller.send_message(Message::SwReq(SwitchArg::new(9, SwitchDirection::Curved, true))).await.unwrap();
+                loco_controller.send_message(Message::SwReq(SwitchArg::new(15, SwitchDirection::Straight, true))).await.unwrap();
+                loco_controller.send_message(Message::SwReq(SwitchArg::new(18, SwitchDirection::Straight, true))).await.unwrap();
             } else {
-                loco_controller.send_message(Message::SwReq(SwitchArg::new(8, SwitchDirection::Curved, true))).await.unwrap();
-                loco_controller.send_message(Message::SwReq(SwitchArg::new(9, SwitchDirection::Straight, true))).await.unwrap();
+                loco_controller.send_message(Message::SwReq(SwitchArg::new(15, SwitchDirection::Curved, true))).await.unwrap();
+                loco_controller.send_message(Message::SwReq(SwitchArg::new(18, SwitchDirection::Curved, true))).await.unwrap();
             }
 
             loco_controller.send_message(LocoSpd(*slot_adr_map.get(&adr).unwrap(), SpeedArg::Drive(100))).await.unwrap();
@@ -249,13 +255,15 @@ mod tests {
                     LocoDriveMessage::Message(message) => {
                         match message {
                             Message::InputRep(in_arg) => {
-                                if i % 2 == 0 && in_arg.address() == 1 && in_arg.input_source() == SourceType::Switch && in_arg.sensor_level() == SensorLevel::High {
+                                if i % 2 == 0 && in_arg.address() == 3 && in_arg.input_source() == SourceType::Switch && in_arg.sensor_level() == SensorLevel::High {
                                     waiting = false;
                                     loco_controller.send_message(LocoSpd(*slot_adr_map.get(&adr).unwrap(), SpeedArg::Drive(50))).await.unwrap();
-                                } else if i % 2 == 1 && in_arg.address() == 2 && in_arg.input_source() == SourceType::Ds54Aux && in_arg.sensor_level() == SensorLevel::High {
+                                } else if i % 2 == 1 && in_arg.address() == 8 && in_arg.input_source() == SourceType::Switch && in_arg.sensor_level() == SensorLevel::High {
                                     waiting = false;
                                     loco_controller.send_message(LocoSpd(*slot_adr_map.get(&adr).unwrap(), SpeedArg::Drive(50))).await.unwrap();
-                                } else if !waiting && in_arg.address() == 2 && in_arg.input_source() == SourceType::Switch && in_arg.sensor_level() == SensorLevel::Low {
+                                } else if !waiting && in_arg.address() == 8 && in_arg.input_source() == SourceType::Ds54Aux && in_arg.sensor_level() == SensorLevel::Low {
+                                    break;
+                                } else if !waiting && in_arg.address() == 1 && in_arg.input_source() == SourceType::Ds54Aux && in_arg.sensor_level() == SensorLevel::Low {
                                     break;
                                 }
                             },
@@ -279,6 +287,10 @@ mod tests {
             sleep(Duration::from_secs(6)).await;
         }
 
-        println!("Drive 10 rounds!")
+        println!("Drive 10 rounds!");
+
+        drop(loco_controller);
+
+        println!("Closed loco net!");
     }
 }

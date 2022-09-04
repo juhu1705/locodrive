@@ -2,10 +2,8 @@ use std::fmt::Debug;
 use crate::error::{LocoDriveSendingError, MessageParseError};
 use crate::protocol::Message;
 use std::sync::{Arc, Mutex};
-use std::thread::{spawn};
 use tokio::time::{sleep, Duration};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::runtime::Runtime;
 use tokio::sync::broadcast::Sender;
 use tokio::task::JoinHandle;
 use tokio::sync::Notify;
@@ -239,27 +237,10 @@ impl LocoDriveController {
     /// This function panics if the reading thread has panicked or the reading thread was killed,
     /// by some external source.
     fn stop_reader(&mut self) {
-        if let Some(reader) = self.reading_thread.take() {
+        if let Some(_reader) = self.reading_thread.take() {
             // Note the thread to end reading
             *self.stop.lock().unwrap() = true;
-            self.fire_stop.notify_waiters();
-            // Wait until the thread is stopped
-            match spawn(move || {
-                let runtime = match Runtime::new() {
-                    Ok(runtime) => runtime,
-                    Err(_) => { return; }
-                };
-                match runtime.block_on(reader) {
-                    Ok(_) => "",
-                    Err(_) => "",
-                };
-            }).join() {
-                Ok(_) => "",
-                Err(_) => "",
-            };
-
-            // We allow new threads to spawn and read from the port
-            *self.stop.lock().unwrap() = false;
+            (*self.fire_stop).notify_waiters();
         }
     }
 
@@ -383,8 +364,6 @@ impl LocoDriveController {
     ) {
         // We read the next message from the serial port
         let parsed = LocoDriveController::read_next_message(port, send, stopping, ignore_send_messages).await;
-
-        println!("Read: {:?}", parsed);
 
         // We check which type the message we received is
         match parsed {
