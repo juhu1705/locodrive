@@ -1,13 +1,7 @@
 /// Tests all testable core functions of this module
 #[cfg(test)]
-mod tests {
-    use std::collections::HashMap;
-    use std::process::exit;
-    use std::time::Duration;
-    use tokio::time::sleep;
-    use tokio_serial::FlowControl;
+mod general_tests {
     use crate::args::{Ack1Arg, AddressArg, Consist, CvDataArg, DecoderType, DirfArg, DstArg, FastClock, FunctionArg, FunctionGroup, IdArg, ImAddress, ImArg, ImFunctionType, InArg, LissyIrReport, LopcArg, MultiSenseArg, Pcmd, ProgrammingAbortedArg, PStat, PxctData, RepStructure, RFID5Report, RFID7Report, SensorLevel, SlotArg, SnArg, SndArg, SourceType, SpeedArg, Stat1Arg, Stat2Arg, State, SwitchArg, SwitchDirection, TrkArg, WheelcntReport, WrSlDataStructure};
-    use crate::loco_controller::{LocoDriveController, LocoDriveMessage};
     use crate::protocol::Message;
     use crate::protocol::Message::{GpOn, LocoSpd};
 
@@ -151,7 +145,22 @@ mod tests {
             message
         );
     }
+}
 
+/// Tests sending and receiving messages using the [LocoDriveController]
+#[cfg(feature = "control")]
+mod test_connector {
+    use crate::loco_controller::{LocoDriveController, LocoDriveMessage};
+    use std::collections::HashMap;
+    use std::process::exit;
+    use std::time::Duration;
+    use tokio::time::sleep;
+    use tokio_serial::FlowControl;
+    use crate::args::{AddressArg, SensorLevel, SlotArg, SourceType, SpeedArg, SwitchArg, SwitchDirection};
+    use crate::protocol::Message;
+    use crate::protocol::Message::{GpOn, LocoSpd};
+
+    /// Test the sending off messages for my model railroad.
     #[tokio::test]
     async fn test_message_sending() {
         println!("Start test!");

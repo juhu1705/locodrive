@@ -41,6 +41,7 @@ impl From<io::Error> for MessageParseError {
 
 /// This error type is used to describe errors appearing on [`crate::loco_controller::LocoDriveController::send_message()`]
 #[derive(Debug, Copy, Clone)]
+#[cfg(feature = "control")]
 pub enum LocoDriveSendingError {
     /// If the reader is closed. This should not happen normally.
     /// If it happens your [`crate::loco_controller::LocoDriveController`] is corrupted and can no longer be used.
@@ -52,6 +53,7 @@ pub enum LocoDriveSendingError {
     NotWritable
 }
 
+#[cfg(feature = "control")]
 impl Display for LocoDriveSendingError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match *self {
@@ -62,4 +64,5 @@ impl Display for LocoDriveSendingError {
     }
 }
 
+#[cfg(feature = "control")]
 impl Error for LocoDriveSendingError {}

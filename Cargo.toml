@@ -12,6 +12,10 @@ A model railroad connection handler to read message from and write messages to s
 """
 categories = ["model train"]
 
+[features]
+control = []
+all = ["control"]
+
 [dependencies]
 tokio-serial = "5.4.1"
 tokio-util = { version = "0.7.3", features = ["codec"] }
