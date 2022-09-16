@@ -188,7 +188,7 @@ pub enum Message {
         Pcmd,
         PStat,
         AddressArg,
-        CvDataArg
+        CvDataArg,
     ),
     /// Indicates that the programming service mode is aborted.
     ProgrammingAborted(ProgrammingAbortedArg),
@@ -237,6 +237,8 @@ impl Message {
     /// [`InvalidChecksum`]: MessageParseError::InvalidChecksum
     /// [`InvalidFormat`]: MessageParseError::InvalidFormat
     pub fn parse(buf: &[u8]) -> Result<Self, MessageParseError> {
+        println!("Parse {:02x?}", buf);
+
         let opc = buf[0];
         // We calculate the length of the remaining message to read
         let len = match opc & 0xE0 {
@@ -292,7 +294,7 @@ impl Message {
     /// [`UnexpectedEnd`]: MessageParseError::UnexpectedEnd
     fn parse4(opc: u8, args: &[u8]) -> Result<Self, MessageParseError> {
         if args.len() != 2 {
-            return Err(MessageParseError::UnexpectedEnd)
+            return Err(MessageParseError::UnexpectedEnd);
         }
         match opc {
             0xBF => Ok(Self::LocoAdr(AddressArg::parse(args[0], args[1]))),
@@ -357,7 +359,7 @@ impl Message {
     /// [`InvalidFormat`]: MessageParseError::InvalidFormat
     fn parse6(opc: u8, args: &[u8]) -> Result<Self, MessageParseError> {
         if args.len() != 4 {
-            return Err(MessageParseError::UnexpectedEnd)
+            return Err(MessageParseError::UnexpectedEnd);
         }
         match opc {
             0xD0 => Ok(Self::MultiSense(
@@ -367,7 +369,8 @@ impl Message {
             0xD4 => {
                 if 0x20 != args[0] {
                     return Err(MessageParseError::InvalidFormat(format!(
-                        "Expected first arg of UhliFun to be 0x20 got {:02x}", args[0]
+                        "Expected first arg of UhliFun to be 0x20 got {:02x}",
+                        args[0]
                     )));
                 }
                 Ok(Self::UhliFun(
@@ -394,23 +397,22 @@ impl Message {
     /// [`InvalidFormat`]: MessageParseError::InvalidFormat
     fn parse_var(opc: u8, args: &[u8]) -> Result<Self, MessageParseError> {
         if args.len() + 2 != args[0] as usize {
-            return Err(MessageParseError::UnexpectedEnd)
+            return Err(MessageParseError::UnexpectedEnd);
         }
         match opc {
             0xED => {
                 if args[1] != 0x7F {
-                    return Err(
-                        MessageParseError::InvalidFormat(
-                            format!("The check byte of the received message was invalid. \
-                            Expected 0x7F got {:02x}", args[1])
-                        )
-                    )
+                    return Err(MessageParseError::InvalidFormat(format!(
+                        "The check byte of the received message was invalid. \
+                            Expected 0x7F got {:02x}",
+                        args[1]
+                    )));
                 }
 
                 Ok(Self::ImmPacket(ImArg::parse(
                     args[1], args[2], args[3], args[4], args[5], args[6], args[7], args[8],
                 )))
-            },
+            }
             0xEF => Ok(Self::WrSlData(WrSlDataStructure::parse(
                 args[1], args[2], args[3], args[4], args[5], args[6], args[7], args[8], args[9],
                 args[10], args[11],
@@ -430,7 +432,7 @@ impl Message {
                         Pcmd::parse(args[2]),
                         PStat::parse(args[3]),
                         AddressArg::parse(args[4], args[5]),
-                        CvDataArg::parse(args[7], args[8], args[9])
+                        CvDataArg::parse(args[7], args[8], args[9]),
                     ))
                 } else {
                     Ok(Self::SlRdData(
@@ -445,16 +447,15 @@ impl Message {
                         IdArg::parse(args[10], args[11]),
                     ))
                 }
-            },
-            0xE6 => {
-                Ok(Message::ProgrammingAborted(ProgrammingAbortedArg::parse(args[0], &args[1..])))
-            },
-            0xE4 => Ok(Self::Rep(
-                match RepStructure::parse(args[0], &args[1..]) {
-                    Err(err) => return Err(err),
-                    Ok(rep) => rep
-                }
-            )),
+            }
+            0xE6 => Ok(Message::ProgrammingAborted(ProgrammingAbortedArg::parse(
+                args[0],
+                &args[1..],
+            ))),
+            0xE4 => Ok(Self::Rep(match RepStructure::parse(args[0], &args[1..]) {
+                Err(err) => return Err(err),
+                Ok(rep) => rep,
+            })),
             0xE5 => Ok(Self::PeerXfer(
                 SlotArg::parse(args[1]),
                 DstArg::parse(args[2], args[3]),
@@ -526,7 +527,21 @@ impl Message {
                 id.id1(),
                 id.id2(),
             ],
-            Message::ProgrammingFinalResponse(slot, stat1, adr, spd, dirf, trk, stat2, snd, id, pcmd, stat, opsa, cv_data) => vec![
+            Message::ProgrammingFinalResponse(
+                slot,
+                stat1,
+                adr,
+                spd,
+                dirf,
+                trk,
+                stat2,
+                snd,
+                id,
+                pcmd,
+                stat,
+                opsa,
+                cv_data,
+            ) => vec![
                 0xE7_u8,
                 0x0E_u8,
                 slot.slot(),
@@ -637,11 +652,11 @@ impl Message {
     pub fn await_slot_data(&self) -> bool {
         matches!(
             self,
-            Message::LocoAdr(..) |
-            Message::RqSlData(..) |
-            Message::MoveSlots(..) |
-            Message::LinkSlots(..) |
-            Message::UnlinkSlots(..)
+            Message::LocoAdr(..)
+                | Message::RqSlData(..)
+                | Message::MoveSlots(..)
+                | Message::LinkSlots(..)
+                | Message::UnlinkSlots(..)
         )
     }
 }

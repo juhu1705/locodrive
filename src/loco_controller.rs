@@ -1,13 +1,15 @@
-use std::fmt::Debug;
 use crate::error::{LocoDriveSendingError, MessageParseError};
 use crate::protocol::Message;
+use std::fmt::Debug;
 use std::sync::{Arc, Mutex};
-use tokio::time::{sleep, Duration};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::sync::broadcast::Sender;
-use tokio::task::JoinHandle;
 use tokio::sync::Notify;
-use tokio_serial::{DataBits, Error, FlowControl, Parity, SerialPort, SerialPortBuilderExt, SerialStream, StopBits};
+use tokio::task::JoinHandle;
+use tokio::time::{sleep, Duration};
+use tokio_serial::{
+    DataBits, Error, FlowControl, Parity, SerialPort, SerialPortBuilderExt, SerialStream, StopBits,
+};
 
 /// This message is sent when data are received from the loco connection.
 #[derive(Debug, Clone)]
@@ -54,6 +56,8 @@ type ReferencedSendSynchronisation<'a> = Arc<(&'a Arc<Mutex<Vec<u8>>>, &'a Arc<N
 ///
 /// #[tokio::main]
 /// async fn main() {
+///     use locodrive::args::{SwitchArg, SwitchDirection};
+///     use locodrive::protocol::Message::SwReq;
 ///     // Creating a sender and receiver for the LocoDriveConnector.
 ///     let (sender, mut receiver) = tokio::sync::broadcast::channel(1);
 ///
@@ -73,7 +77,7 @@ type ReferencedSendSynchronisation<'a> = Arc<(&'a Arc<Mutex<Vec<u8>>>, &'a Arc<N
 ///         }
 ///     };
 ///
-///     loco_controller.send_message(LocoSpd(SlotArg::new(3), SpeedArg::Stop));
+///     loco_controller.send_message(SwReq(SwitchArg::new(39, SwitchDirection::Straight, true)));
 ///
 ///     let mut read_messages = 0;
 ///     while let Ok(message) = receiver.recv().await {
@@ -158,26 +162,26 @@ impl LocoDriveController {
         port.set_exclusive(false)?;
 
         // Takes care of the writer reader synchronisation
-        let send = Arc::new((
-            Arc::new(Mutex::new(vec![0u8; 0])),
-            Arc::new(Notify::new()),
-        ));
+        let send = Arc::new((Arc::new(Mutex::new(vec![0u8; 0])), Arc::new(Notify::new())));
 
         // Used to stop a reader when the the value was dropped
         let stop = Arc::new(Mutex::new(false));
         let fire_stop = Arc::new(Notify::new());
 
         // Starts the reading thread
-        let reading_thread = Some(LocoDriveController::start_reading_thread(
-            port_name.to_string(),
-            baud_rate,
-            flow_control,
-            &send,
-            &send_to,
-            &stop,
-            &fire_stop,
-            ignore_send_messages
-        ).await);
+        let reading_thread = Some(
+            LocoDriveController::start_reading_thread(
+                port_name.to_string(),
+                baud_rate,
+                flow_control,
+                &send,
+                &send_to,
+                &stop,
+                &fire_stop,
+                ignore_send_messages,
+            )
+            .await,
+        );
 
         let wait_for_write = Arc::new(tokio::sync::Mutex::new(false));
 
@@ -225,7 +229,8 @@ impl LocoDriveController {
     /// If some error occurred on overriding the timeout on the port.
     pub fn set_sending_timeout(&mut self, sending_timeout: u64) -> Result<(), Error> {
         self.sending_timeout = sending_timeout;
-        self.port.set_timeout(Duration::from_millis(sending_timeout))
+        self.port
+            .set_timeout(Duration::from_millis(sending_timeout))
     }
 
     /// Stops the async model railroads message reader and wait until the tokio thread is joined.
@@ -295,21 +300,27 @@ impl LocoDriveController {
                 Ok(port) => port,
                 Err(err) => {
                     if let Err(err) = arc_send_to.send(LocoDriveMessage::SerialPortError(err)) {
-                        eprintln!("[locodrive:ERROR] Unable to send critical error to receiver! \
+                        eprintln!(
+                            "[locodrive:ERROR] Unable to send critical error to receiver! \
                         Closed connection to the serial port!\n \
-                        Following error occurred: {:?}", err);
+                        Following error occurred: {:?}",
+                            err
+                        );
                     }
                     return;
-                },
+                }
             };
 
             // For linux systems we once more ensure that this set is not exclusive usable for us
             #[cfg(unix)]
             if let Err(err) = port.set_exclusive(false) {
                 if let Err(err) = arc_send_to.send(LocoDriveMessage::SerialPortError(err)) {
-                    eprintln!("[locodrive:ERROR] Unable to send critical error to receiver! \
+                    eprintln!(
+                        "[locodrive:ERROR] Unable to send critical error to receiver! \
                     Closed connection to the serial port!\n \
-                    Following error occurred: {:?}", err);
+                    Following error occurred: {:?}",
+                        err
+                    );
                 };
                 return;
             };
@@ -319,8 +330,7 @@ impl LocoDriveController {
             // The last message to pass when a lack was received
             let mut last_message = Message::Busy;
 
-            let new_arc_send_locked =
-                Arc::new((&last_message_move, &notify_wait_move));
+            let new_arc_send_locked = Arc::new((&last_message_move, &notify_wait_move));
 
             println!("[locodrive:INFO] Reading thread started!");
 
@@ -334,7 +344,7 @@ impl LocoDriveController {
                     &mut last_message,
                     &arc_send_to,
                     &new_arc_stopping,
-                    ignore_send_messages
+                    ignore_send_messages,
                 )
                 .await;
             }
@@ -363,7 +373,9 @@ impl LocoDriveController {
         ignore_send_messages: bool,
     ) {
         // We read the next message from the serial port
-        let parsed = LocoDriveController::read_next_message(port, send, stopping, ignore_send_messages).await;
+        let parsed =
+            LocoDriveController::read_next_message(port, send, stopping, ignore_send_messages)
+                .await;
 
         // We check which type the message we received is
         match parsed {
@@ -384,18 +396,18 @@ impl LocoDriveController {
                         Message::LongAck(lopc, _) => {
                             if lopc.check_opc(last_message) {
                                 // We notify our listener of that long acknowledgment
-                                if let Err(err) = send_to.send(
-                                    LocoDriveMessage::Answer(message, *last_message)
-                                ) {
+                                if let Err(err) =
+                                    send_to.send(LocoDriveMessage::Answer(message, *last_message))
+                                {
                                     eprintln!("[locodrive:ERROR] {:?}", err);
                                 };
                             }
                         }
                         Message::SlRdData(..) => {
                             if last_message.await_slot_data() {
-                                if let Err(err) = send_to.send(
-                                    LocoDriveMessage::Answer(message, *last_message)
-                                ) {
+                                if let Err(err) =
+                                    send_to.send(LocoDriveMessage::Answer(message, *last_message))
+                                {
                                     eprintln!("[locodrive:ERROR] {:?}", err);
                                 };
                             }
@@ -478,6 +490,8 @@ impl LocoDriveController {
             _ => return Err(MessageParseError::UnknownOpcode(opc)),
         };
 
+        println!("Parse massage of type: {:02x?}, with {:?} bytes", opc, len);
+
         // As we already read the messages opcode
         let mut message = vec![0u8; len - 1];
 
@@ -496,7 +510,7 @@ impl LocoDriveController {
             cvar.notify_waiters();
 
             if ignore_send_messages {
-                return Err(MessageParseError::Update)
+                return Err(MessageParseError::Update);
             }
         }
 
@@ -517,7 +531,7 @@ impl LocoDriveController {
     pub async fn send_message(&mut self, message: Message) -> Result<(), LocoDriveSendingError> {
         // If we have no reading thread we raise an error, that should not be possible
         if self.reading_thread.is_none() {
-            return Err(LocoDriveSendingError::IllegalState)
+            return Err(LocoDriveSendingError::IllegalState);
         }
 
         let _send_message_waiting = self.wait_for_write.lock().await;

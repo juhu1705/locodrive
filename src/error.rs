@@ -26,7 +26,7 @@ impl Display for MessageParseError {
             Self::UnexpectedEnd => write!(f, "unexpected end of stream"),
             Self::InvalidChecksum => write!(f, "invalid checksum"),
             Self::Update => write!(f, "update"),
-            Self::InvalidFormat(ref message) => write!(f, "invalid format: {:?}", message)
+            Self::InvalidFormat(ref message) => write!(f, "invalid format: {:?}", message),
         }
     }
 }
@@ -49,7 +49,7 @@ pub enum LocoDriveSendingError {
     Timeout,
     /// The railroad control system connection returns writing with an error.
     /// Please recheck your connection.
-    NotWritable
+    NotWritable,
 }
 
 impl Display for LocoDriveSendingError {

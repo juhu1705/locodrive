@@ -1,8 +1,8 @@
 #![allow(clippy::too_many_arguments)]
 
-use std::fmt::{Debug, Display, Formatter};
 use crate::error::MessageParseError;
 use crate::protocol::Message;
+use std::fmt::{Debug, Display, Formatter};
 
 /// Represents a trains address of 14 byte length.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
@@ -1207,7 +1207,7 @@ pub enum SnArg {
     /// - 0: Device address
     /// - 1: The activation state of the straight switch part
     /// - 2: The activation state of the curved switch part
-    SwitchDirectionStatus(u16, SensorLevel, SensorLevel)
+    SwitchDirectionStatus(u16, SensorLevel, SensorLevel),
 }
 
 impl SnArg {
@@ -1222,16 +1222,20 @@ impl SnArg {
         let c = sn2 & 0x20 == 0x20;
 
         if format {
-            SnArg::SwitchType(
-                address,
-                c,
-                t
-            )
+            SnArg::SwitchType(address, c, t)
         } else {
             SnArg::SwitchDirectionStatus(
                 address,
-                if c { SensorLevel::High } else { SensorLevel::Low },
-                if t { SensorLevel::High } else { SensorLevel::Low }
+                if c {
+                    SensorLevel::High
+                } else {
+                    SensorLevel::Low
+                },
+                if t {
+                    SensorLevel::High
+                } else {
+                    SensorLevel::Low
+                },
             )
         }
     }
@@ -1242,7 +1246,7 @@ impl SnArg {
     pub fn address(&self) -> u16 {
         match *self {
             SnArg::SwitchType(address, ..) => address,
-            SnArg::SwitchDirectionStatus(address, ..) => address
+            SnArg::SwitchDirectionStatus(address, ..) => address,
         }
     }
 
@@ -1252,8 +1256,9 @@ impl SnArg {
     pub(crate) fn sn1(&self) -> u8 {
         (match *self {
             SnArg::SwitchDirectionStatus(address, ..) => address,
-            SnArg::SwitchType(address, ..) => address
-        } as u8) & 0x7F
+            SnArg::SwitchType(address, ..) => address,
+        } as u8)
+            & 0x7F
     }
 
     /// # Returns
@@ -1272,11 +1277,11 @@ impl SnArg {
 
                 sn2 |= match straight_status {
                     SensorLevel::High => 0x20,
-                    SensorLevel::Low => 0x00
+                    SensorLevel::Low => 0x00,
                 };
                 sn2 | match curved_status {
                     SensorLevel::High => 0x10,
-                    SensorLevel::Low => 0x00
+                    SensorLevel::Low => 0x00,
                 }
             }
         }
@@ -1430,7 +1435,7 @@ pub enum FunctionGroup {
     /// Function bits 12, 20 and 28 are available
     F12F20F28,
     /// Function bit 21 to 27 are available
-    F21TO27
+    F21TO27,
 }
 
 /// Represents the function bits of one function group.
@@ -1447,12 +1452,15 @@ impl FunctionArg {
     ///
     /// - `group`: The functions group to set the values to.
     pub fn new(group: FunctionGroup) -> Self {
-        FunctionArg(match group {
-            FunctionGroup::F9TO11 => 0x07,
-            FunctionGroup::F13TO19 => 0x08,
-            FunctionGroup::F12F20F28 => 0x05,
-            FunctionGroup::F21TO27 => 0x09,
-        }, 0)
+        FunctionArg(
+            match group {
+                FunctionGroup::F9TO11 => 0x07,
+                FunctionGroup::F13TO19 => 0x08,
+                FunctionGroup::F12F20F28 => 0x05,
+                FunctionGroup::F21TO27 => 0x09,
+            },
+            0,
+        )
     }
 
     /// Parses the group and function bits from two bits.
@@ -1559,14 +1567,15 @@ impl Debug for FunctionArg {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self.function_group() {
             FunctionGroup::F9TO11 => {
-                write!(f,
-                       "function_arg: (group: {:?}, f9: {}, f10: {}, f11: {})",
-                       FunctionGroup::F9TO11,
-                       self.f(9),
-                       self.f(10),
-                       self.f(11)
+                write!(
+                    f,
+                    "function_arg: (group: {:?}, f9: {}, f10: {}, f11: {})",
+                    FunctionGroup::F9TO11,
+                    self.f(9),
+                    self.f(10),
+                    self.f(11)
                 )
-            },
+            }
             FunctionGroup::F13TO19 => {
                 write!(f,
                        "function_arg: (group: {:?}, f13: {}, f14: {}, f15: {}, f16: {}, f17: {}, f18: {}, f19: {})",
@@ -1579,16 +1588,17 @@ impl Debug for FunctionArg {
                        self.f(18),
                        self.f(19),
                 )
-            },
+            }
             FunctionGroup::F12F20F28 => {
-                write!(f,
-                       "function_arg: (group: {:?}, f12: {}, f20: {}, f28: {})",
-                       FunctionGroup::F12F20F28,
-                       self.f(12),
-                       self.f(20),
-                       self.f(28)
+                write!(
+                    f,
+                    "function_arg: (group: {:?}, f12: {}, f20: {}, f28: {})",
+                    FunctionGroup::F12F20F28,
+                    self.f(12),
+                    self.f(20),
+                    self.f(28)
                 )
-            },
+            }
             FunctionGroup::F21TO27 => {
                 write!(f,
                        "function_arg: (group: {:?}, f21: {}, f22: {}, f23: {}, f24: {}, f25: {}, f26: {}, f27: {})",
@@ -1601,7 +1611,7 @@ impl Debug for FunctionArg {
                        self.f(26),
                        self.f(27)
                 )
-            },
+            }
         }
     }
 }
@@ -1702,7 +1712,6 @@ impl Pcmd {
     pub fn ty1(&self) -> bool {
         self.ty1
     }
-
 
     /// Sets the write argument
     ///
@@ -2016,7 +2025,6 @@ pub struct FastClock {
 }
 
 impl FastClock {
-
     /// Creates a new clock synchronise information
     ///
     /// # Parameters
@@ -2027,21 +2035,14 @@ impl FastClock {
     /// - `hours`: The clocks hours calculated by 256-HRS%24
     /// - `days`: The number of 24 hour cycles passed
     /// - `clk_cntrl`: Clock control information. third bit must be true to mark this clock data valid.
-    pub fn new(
-        clk_rate: u8,
-        frac_mins: u16,
-        mins: u8,
-        hours: u8,
-        days: u8,
-        clk_cntrl: u8
-    ) -> Self {
+    pub fn new(clk_rate: u8, frac_mins: u16, mins: u8, hours: u8, days: u8, clk_cntrl: u8) -> Self {
         FastClock {
             clk_rate,
             frac_mins,
             mins,
             hours,
             days,
-            clk_cntrl
+            clk_cntrl,
         }
     }
 
@@ -2142,7 +2143,7 @@ pub enum ImFunctionType {
     /// Functions 13 to 20 (inclusive) are accessible
     F13to20,
     /// Functions 21 to 28 (inclusive) are accessible
-    F21to28
+    F21to28,
 }
 
 /// The address in the right format used by the corresponding [ImArg]
@@ -2151,7 +2152,7 @@ pub enum ImAddress {
     /// A short 8 bit address
     Short(u8),
     /// A long 16 bit address
-    Long(u16)
+    Long(u16),
 }
 
 /// This arg hold function bit information
@@ -2178,12 +2179,7 @@ impl ImArg {
     /// - `address`: The address to set the function bits for
     /// - `function_type`: Wich functions should be settable
     /// - `im5`: Unused parameter
-    pub fn new(
-        dhi: u8,
-        address: ImAddress,
-        function_type: ImFunctionType,
-        im5: u8,
-    ) -> Self {
+    pub fn new(dhi: u8, address: ImAddress, function_type: ImFunctionType, im5: u8) -> Self {
         ImArg {
             dhi,
             address,
@@ -2273,12 +2269,12 @@ impl ImArg {
                 ImFunctionType::F9to12 => 0x24,
                 ImFunctionType::F13to20 => 0x34,
                 ImFunctionType::F21to28 => 0x34,
-            }
+            },
             ImAddress::Long(_) => match self.function_type {
                 ImFunctionType::F9to12 => 0x34,
                 ImFunctionType::F13to20 => 0x44,
                 ImFunctionType::F21to28 => 0x44,
-            }
+            },
         }
     }
 
@@ -2359,16 +2355,12 @@ impl ImArg {
     /// The second function arg
     pub(crate) fn im2(&self) -> u8 {
         match self.address {
-            ImAddress::Short(_) => {
-                match self.function_type {
-                    ImFunctionType::F9to12 => (self.function_bits & 0x7F) | 0x20,
-                    ImFunctionType::F13to20 => 0x5E,
-                    ImFunctionType::F21to28 => 0x5F,
-                }
+            ImAddress::Short(_) => match self.function_type {
+                ImFunctionType::F9to12 => (self.function_bits & 0x7F) | 0x20,
+                ImFunctionType::F13to20 => 0x5E,
+                ImFunctionType::F21to28 => 0x5F,
             },
-            ImAddress::Long(adr) => {
-                (adr >> 8) as u8
-            }
+            ImAddress::Long(adr) => (adr >> 8) as u8,
         }
     }
 
@@ -2383,14 +2375,12 @@ impl ImArg {
                 } else {
                     self.function_bits
                 }
-            },
-            ImAddress::Long(_) => {
-                match self.function_type {
-                    ImFunctionType::F9to12 => (self.function_bits & 0x7F) | 0x20,
-                    ImFunctionType::F13to20 => 0x5E,
-                    ImFunctionType::F21to28 => 0x5F,
-                }
             }
+            ImAddress::Long(_) => match self.function_type {
+                ImFunctionType::F9to12 => (self.function_bits & 0x7F) | 0x20,
+                ImFunctionType::F13to20 => 0x5E,
+                ImFunctionType::F21to28 => 0x5F,
+            },
         }
     }
 
@@ -2445,11 +2435,20 @@ pub enum WrSlDataStructure {
     /// - `TrkArg`: The general track information
     /// - `SndArg`: Additional function bits
     /// - `IdArg`: The ID of the slots user
-    DataGeneral(SlotArg, Stat1Arg, Stat2Arg, AddressArg, SpeedArg, DirfArg, TrkArg, SndArg, IdArg),
+    DataGeneral(
+        SlotArg,
+        Stat1Arg,
+        Stat2Arg,
+        AddressArg,
+        SpeedArg,
+        DirfArg,
+        TrkArg,
+        SndArg,
+        IdArg,
+    ),
 }
 
 impl WrSlDataStructure {
-
     /// Parses eleven incoming bytes to one write slot data message
     pub(crate) fn parse(
         arg1: u8,
@@ -2473,9 +2472,7 @@ impl WrSlDataStructure {
             )
         } else if arg1 == 0x7B {
             WrSlDataStructure::DataTime(
-                FastClock::parse(
-                    arg2, arg3, arg4, arg5, arg7, arg8, arg9,
-                ),
+                FastClock::parse(arg2, arg3, arg4, arg5, arg7, arg8, arg9),
                 TrkArg::parse(arg6),
                 IdArg::parse(arg10, arg11),
             )
@@ -2501,7 +2498,7 @@ impl WrSlDataStructure {
         match self {
             WrSlDataStructure::DataPt(..) => 0x7C,
             WrSlDataStructure::DataTime(..) => 0x7B,
-            WrSlDataStructure::DataGeneral(slot, ..) => slot.slot()
+            WrSlDataStructure::DataGeneral(slot, ..) => slot.slot(),
         }
     }
 
@@ -2526,7 +2523,7 @@ impl WrSlDataStructure {
                     0x00,
                     0x00,
                 ]
-            },
+            }
             WrSlDataStructure::DataTime(fast_clock, trk, id) => {
                 vec![
                     0xEF,
@@ -2543,8 +2540,18 @@ impl WrSlDataStructure {
                     id.id1(),
                     id.id2(),
                 ]
-            },
-            WrSlDataStructure::DataGeneral(slot, stat1, stat2, adr, speed, dirf, trk, sound, id) => {
+            }
+            WrSlDataStructure::DataGeneral(
+                slot,
+                stat1,
+                stat2,
+                adr,
+                speed,
+                dirf,
+                trk,
+                sound,
+                id,
+            ) => {
                 vec![
                     0xEF,
                     0x0E,
@@ -2600,13 +2607,7 @@ impl LissyIrReport {
     /// - `low_unit`: The least significant unit bits
     /// - `high_adr`: The most significant address bits
     /// - `low_adr`: The least significant address bits
-    pub(crate) fn parse(
-        arg1: u8,
-        high_unit: u8,
-        low_unit: u8,
-        high_adr: u8,
-        low_adr: u8,
-    ) -> Self {
+    pub(crate) fn parse(arg1: u8, high_unit: u8, low_unit: u8, high_adr: u8, low_adr: u8) -> Self {
         let dir = high_unit & 0x40 == 0x40;
         let unit = (((high_unit & 0x3F) as u16) << 7) | (low_unit as u16);
         let address = (((high_adr & 0x7F) as u16) << 7) | (low_adr as u16);
@@ -2793,7 +2794,6 @@ impl RFID5Report {
         self.rfid2
     }
 
-
     /// # Returns
     ///
     /// The fourth reported rfid byte
@@ -2801,14 +2801,12 @@ impl RFID5Report {
         self.rfid3
     }
 
-
     /// # Returns
     ///
     /// The fifth reported rfid byte
     pub fn rfid4(&self) -> u8 {
         self.rfid4
     }
-
 
     /// # Returns
     ///
@@ -3132,7 +3130,9 @@ impl RepStructure {
                 args[9], args[10],
             )))
         } else {
-            Err(MessageParseError::InvalidFormat("The report message was in invalid format!".into()))
+            Err(MessageParseError::InvalidFormat(
+                "The report message was in invalid format!".into(),
+            ))
         }
     }
 }
@@ -3425,52 +3425,48 @@ impl ProgrammingAbortedArg {
     /// - `args`: The argument values. 0x10 = 0 - 12 filled, 0x15 = 0 - 17 filled
     pub(crate) fn parse(len: u8, args: &[u8]) -> Self {
         match len {
-            0x10 => {
-                ProgrammingAbortedArg {
-                    arg_len: len,
-                    arg1: args[0],
-                    arg2: args[1],
-                    arg3: args[2],
-                    arg4: args[3],
-                    arg5: args[4],
-                    arg6: args[5],
-                    arg7: args[6],
-                    arg8: args[7],
-                    arg9: args[8],
-                    arg10: args[9],
-                    arg11: args[10],
-                    arg12: args[11],
-                    arg13: args[12],
-                    arg14: 0,
-                    arg15: 0,
-                    arg16: 0,
-                    arg17: 0,
-                    arg18: 0,
-                }
+            0x10 => ProgrammingAbortedArg {
+                arg_len: len,
+                arg1: args[0],
+                arg2: args[1],
+                arg3: args[2],
+                arg4: args[3],
+                arg5: args[4],
+                arg6: args[5],
+                arg7: args[6],
+                arg8: args[7],
+                arg9: args[8],
+                arg10: args[9],
+                arg11: args[10],
+                arg12: args[11],
+                arg13: args[12],
+                arg14: 0,
+                arg15: 0,
+                arg16: 0,
+                arg17: 0,
+                arg18: 0,
             },
-            len => {
-                ProgrammingAbortedArg {
-                    arg_len: len,
-                    arg1: args[0],
-                    arg2: args[1],
-                    arg3: args[2],
-                    arg4: args[3],
-                    arg5: args[4],
-                    arg6: args[5],
-                    arg7: args[6],
-                    arg8: args[7],
-                    arg9: args[8],
-                    arg10: args[9],
-                    arg11: args[10],
-                    arg12: args[11],
-                    arg13: args[12],
-                    arg14: args[13],
-                    arg15: args[14],
-                    arg16: args[15],
-                    arg17: args[16],
-                    arg18: args[17],
-                }
-            }
+            len => ProgrammingAbortedArg {
+                arg_len: len,
+                arg1: args[0],
+                arg2: args[1],
+                arg3: args[2],
+                arg4: args[3],
+                arg5: args[4],
+                arg6: args[5],
+                arg7: args[6],
+                arg8: args[7],
+                arg9: args[8],
+                arg10: args[9],
+                arg11: args[10],
+                arg12: args[11],
+                arg13: args[12],
+                arg14: args[13],
+                arg15: args[14],
+                arg16: args[15],
+                arg17: args[16],
+                arg18: args[17],
+            },
         }
     }
 
@@ -3480,43 +3476,13 @@ impl ProgrammingAbortedArg {
     pub(crate) fn to_message(self) -> Vec<u8> {
         match self.arg_len {
             0x10 => vec![
-                0xE6,
-                0x10,
-                self.arg1,
-                self.arg2,
-                self.arg3,
-                self.arg4,
-                self.arg5,
-                self.arg6,
-                self.arg7,
-                self.arg8,
-                self.arg9,
-                self.arg10,
-                self.arg11,
-                self.arg12,
-                self.arg13
+                0xE6, 0x10, self.arg1, self.arg2, self.arg3, self.arg4, self.arg5, self.arg6,
+                self.arg7, self.arg8, self.arg9, self.arg10, self.arg11, self.arg12, self.arg13,
             ],
             _ => vec![
-                0xE6,
-                0x15,
-                self.arg1,
-                self.arg2,
-                self.arg3,
-                self.arg4,
-                self.arg5,
-                self.arg6,
-                self.arg7,
-                self.arg8,
-                self.arg9,
-                self.arg10,
-                self.arg11,
-                self.arg12,
-                self.arg13,
-                self.arg14,
-                self.arg15,
-                self.arg16,
-                self.arg17,
-                self.arg18
+                0xE6, 0x15, self.arg1, self.arg2, self.arg3, self.arg4, self.arg5, self.arg6,
+                self.arg7, self.arg8, self.arg9, self.arg10, self.arg11, self.arg12, self.arg13,
+                self.arg14, self.arg15, self.arg16, self.arg17, self.arg18,
             ],
         }
     }
