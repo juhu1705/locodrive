@@ -5,6 +5,7 @@ edition = "2018"
 authors = ["Fabius Mettner <fabius1705@live.de>", "Niklas Elsbrock <mail@nelsbrock.de>"]
 license = "MIT OR Apache-2.0"
 readme = "README.md"
+homepage = "https://github.com/juhu1705/locodrive"
 repository = "https://github.com/juhu1705/locodrive"
 documentation = "https://juhu1705.github.io/locodrive/doc/locodrive"
 description = """
@@ -12,8 +13,12 @@ A model railroad connection handler to read message from and write messages to s
 """
 categories = ["model train"]
 
+[features]
+control = []
+all = ["control"]
+
 [dependencies]
 tokio-serial = "5.4.1"
-tokio-util = { version = "0.7.3", features = ["codec"] }
+tokio-util = { version = "0.7.4", features = ["codec"] }
 bytes = "1.2.1"
 tokio = { version = "1", features = ["rt", "rt-multi-thread", "io-util", "macros", "sync", "time"] }

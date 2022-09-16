@@ -1,5 +1,6 @@
 /// Tests all testable core functions of this module
 #[cfg(test)]
+#[cfg(feature = "control")]
 mod tests {
     use crate::args::{
         Ack1Arg, AddressArg, Consist, CvDataArg, DecoderType, DirfArg, DstArg, FastClock,

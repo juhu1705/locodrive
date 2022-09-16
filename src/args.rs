@@ -66,6 +66,17 @@ pub enum SwitchDirection {
     Curved,
 }
 
+impl std::ops::Not for SwitchDirection {
+    type Output = SwitchDirection;
+
+    fn not(self) -> Self::Output {
+        match self {
+            SwitchDirection::Straight => SwitchDirection::Curved,
+            SwitchDirection::Curved => SwitchDirection::Straight,
+        }
+    }
+}
+
 /// Holds switch state information to be read or write
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct SwitchArg {
@@ -1015,6 +1026,17 @@ pub enum SensorLevel {
     High,
     /// The sensor detects no energy flow (sensor off)
     Low,
+}
+
+impl std::ops::Not for SensorLevel {
+    type Output = SensorLevel;
+
+    fn not(self) -> Self::Output {
+        match self {
+            SensorLevel::High => SensorLevel::Low,
+            SensorLevel::Low => SensorLevel::High,
+        }
+    }
 }
 
 /// Represents an sensor input argument
