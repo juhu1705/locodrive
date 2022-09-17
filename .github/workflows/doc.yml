@@ -29,7 +29,7 @@ jobs:
       - name: Setup Pages
         uses: actions/configure-pages@v2
       - name: Build Rust documentation
-        run: cargo doc --no-deps --target-dir "./_site"
+        run: cargo doc --no-deps --all-features --target-dir "./_site"
       - name: Add index page
         run: echo "<meta http-equiv=\"refresh\" content=\"0; url=doc/locodrive\">" > ./_site/index.html
       - name: Upload artifact

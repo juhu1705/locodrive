@@ -603,6 +603,49 @@ impl Message {
         0xFF - msg.iter().fold(0, |acc, &b| acc ^ b)
     }
 
+    /// Checks whether the given operation code is a valid
+    /// known operation code that could be passed by this protocol implementation.
+    ///
+    /// # Parameters
+    ///
+    /// - `opc`: The operation code to check
+    ///
+    /// # Returns
+    ///
+    /// If the given operation code is known
+    pub fn known_opc(opc: u8) -> bool {
+        matches!(
+            opc,
+            0x85 | 0x83
+                | 0x82
+                | 0x81
+                | 0xBF
+                | 0xBD
+                | 0xBC
+                | 0xBB
+                | 0xBA
+                | 0xB9
+                | 0xB8
+                | 0xB6
+                | 0xB5
+                | 0xB4
+                | 0xB2
+                | 0xB1
+                | 0xB0
+                | 0xA2
+                | 0xA1
+                | 0xA0
+                | 0xD0
+                | 0xD4
+                | 0xEF
+                | 0xE7
+                | 0xE6
+                | 0xE5
+                | 0xE4
+                | 0xED
+        )
+    }
+
     /// # Returns
     ///
     /// The op code for the specified message

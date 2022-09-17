@@ -3391,23 +3391,23 @@ pub struct ProgrammingAbortedArg {
     /// The count of args to write to the message 0x10 or 0x15
     pub arg_len: u8,
     /// The first argument
-    pub arg1: u8,
+    pub arg01: u8,
     /// The second argument
-    pub arg2: u8,
+    pub arg02: u8,
     /// The third argument
-    pub arg3: u8,
+    pub arg03: u8,
     /// The fourth argument
-    pub arg4: u8,
+    pub arg04: u8,
     /// The fifth argument
-    pub arg5: u8,
+    pub arg05: u8,
     /// The sixth argument
-    pub arg6: u8,
+    pub arg06: u8,
     /// The seventh argument
-    pub arg7: u8,
+    pub arg07: u8,
     /// The eighth argument
-    pub arg8: u8,
+    pub arg08: u8,
     /// The ninth argument
-    pub arg9: u8,
+    pub arg09: u8,
     /// The tenth argument
     pub arg10: u8,
     /// The eleventh argument
@@ -3449,15 +3449,15 @@ impl ProgrammingAbortedArg {
         match len {
             0x10 => ProgrammingAbortedArg {
                 arg_len: len,
-                arg1: args[0],
-                arg2: args[1],
-                arg3: args[2],
-                arg4: args[3],
-                arg5: args[4],
-                arg6: args[5],
-                arg7: args[6],
-                arg8: args[7],
-                arg9: args[8],
+                arg01: args[0],
+                arg02: args[1],
+                arg03: args[2],
+                arg04: args[3],
+                arg05: args[4],
+                arg06: args[5],
+                arg07: args[6],
+                arg08: args[7],
+                arg09: args[8],
                 arg10: args[9],
                 arg11: args[10],
                 arg12: args[11],
@@ -3470,15 +3470,15 @@ impl ProgrammingAbortedArg {
             },
             len => ProgrammingAbortedArg {
                 arg_len: len,
-                arg1: args[0],
-                arg2: args[1],
-                arg3: args[2],
-                arg4: args[3],
-                arg5: args[4],
-                arg6: args[5],
-                arg7: args[6],
-                arg8: args[7],
-                arg9: args[8],
+                arg01: args[0],
+                arg02: args[1],
+                arg03: args[2],
+                arg04: args[3],
+                arg05: args[4],
+                arg06: args[5],
+                arg07: args[6],
+                arg08: args[7],
+                arg09: args[8],
                 arg10: args[9],
                 arg11: args[10],
                 arg12: args[11],
@@ -3498,12 +3498,12 @@ impl ProgrammingAbortedArg {
     pub(crate) fn to_message(self) -> Vec<u8> {
         match self.arg_len {
             0x10 => vec![
-                0xE6, 0x10, self.arg1, self.arg2, self.arg3, self.arg4, self.arg5, self.arg6,
-                self.arg7, self.arg8, self.arg9, self.arg10, self.arg11, self.arg12, self.arg13,
+                0xE6, 0x10, self.arg01, self.arg02, self.arg03, self.arg04, self.arg05, self.arg06,
+                self.arg07, self.arg08, self.arg09, self.arg10, self.arg11, self.arg12, self.arg13,
             ],
             _ => vec![
-                0xE6, 0x15, self.arg1, self.arg2, self.arg3, self.arg4, self.arg5, self.arg6,
-                self.arg7, self.arg8, self.arg9, self.arg10, self.arg11, self.arg12, self.arg13,
+                0xE6, 0x15, self.arg01, self.arg02, self.arg03, self.arg04, self.arg05, self.arg06,
+                self.arg07, self.arg08, self.arg09, self.arg10, self.arg11, self.arg12, self.arg13,
                 self.arg14, self.arg15, self.arg16, self.arg17, self.arg18,
             ],
         }

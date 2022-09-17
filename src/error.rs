@@ -39,7 +39,8 @@ impl From<io::Error> for MessageParseError {
     }
 }
 
-/// This error type is used to describe errors appearing on [`crate::loco_controller::LocoDriveController::send_message()`]
+/// This error type is used to describe errors appearing on [`crate::loco_controller::LocoDriveController::send_message()`].
+/// This error comes with the `control` feature. You have to explicitly activate it.
 #[derive(Debug, Copy, Clone)]
 #[cfg(feature = "control")]
 pub enum LocoDriveSendingError {

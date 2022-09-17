@@ -12,7 +12,12 @@ A rust library for controlling a model train railroad system.
 ## Importing the LocoDrive
 
 As rust is able to use GitHub repositories directly as dependencies you can simply add 
-`locodrive = { git = "https://github.com/juhu1705/locodrive.git" }` to your `Cargo.toml`
+`locodrive = "0.1.1"` to your `Cargo.toml`
+
+### Features
+
+- `control`: The control feature allows you to access the `LocoDriveController`. This struct allows you to read and write messages to a specified serial port on your device. 
+             Therefore, the async runtime `tokio`, with the extras `tokio-serial` and `tokio-util` as well as the `bytes` module are needed. Please read the documentation for more information about how to use the LocoDriveController.
 
 ## Using the LocoDrive
 
