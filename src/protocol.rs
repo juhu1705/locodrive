@@ -237,8 +237,6 @@ impl Message {
     /// [`InvalidChecksum`]: MessageParseError::InvalidChecksum
     /// [`InvalidFormat`]: MessageParseError::InvalidFormat
     pub fn parse(buf: &[u8]) -> Result<Self, MessageParseError> {
-        println!("Parse {:02x?}", buf);
-
         let opc = buf[0];
         // We calculate the length of the remaining message to read
         let len = match opc & 0xE0 {

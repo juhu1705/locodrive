@@ -490,8 +490,6 @@ impl LocoDriveController {
             _ => return Err(MessageParseError::UnknownOpcode(opc)),
         };
 
-        println!("Parse massage of type: {:02x?}, with {:?} bytes", opc, len);
-
         // As we already read the messages opcode
         let mut message = vec![0u8; len - 1];
 
