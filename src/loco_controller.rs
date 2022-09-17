@@ -469,6 +469,10 @@ impl LocoDriveController {
             }
         };
 
+        if !Message::known_opc(opc) {
+            return Err(MessageParseError::UnknownOpcode(opc));
+        }
+
         // We calculate the length of the remaining message to read
         let len = match opc & 0xE0 {
             0x80 => 2,

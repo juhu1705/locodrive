@@ -204,7 +204,7 @@ mod tests {
     }
 
     /// Reads bytewise from port. This is for testing purposes only.
-    #[warn(dead_code)]
+    #[allow(dead_code)]
     async fn test_reading() {
         let mut port = match tokio_serial::new("/dev/ttyUSB0", 115_200)
             .data_bits(DataBits::Eight)
