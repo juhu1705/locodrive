@@ -3135,13 +3135,21 @@ impl RepStructure {
     /// - `args`: The messages arguments to parse
     pub(crate) fn parse(count: u8, args: &[u8]) -> Result<Self, MessageParseError> {
         if args[0] == 0x00 {
-            Ok(Self::LissyIrReport(LissyIrReport::parse(
-                args[0], args[1], args[2], args[3], args[4],
-            )))
+            if count != 0x08 {
+                Err(MessageParseError::UnexpectedEnd)
+            } else {
+                Ok(Self::LissyIrReport(LissyIrReport::parse(
+                    args[0], args[1], args[2], args[3], args[4],
+                )))
+            }
         } else if args[0] == 0x40 {
-            Ok(Self::WheelcntReport(WheelcntReport::parse(
-                args[0], args[1], args[2], args[3], args[4],
-            )))
+            if count != 0x08 {
+                Err(MessageParseError::UnexpectedEnd)
+            } else {
+                Ok(Self::WheelcntReport(WheelcntReport::parse(
+                    args[0], args[1], args[2], args[3], args[4],
+                )))
+            }
         } else if args[0] == 0x41 && count == 0x0C {
             Ok(Self::RFID5Report(RFID5Report::parse(
                 args[0], args[1], args[2], args[3], args[4], args[5], args[6], args[7], args[8],
@@ -3468,7 +3476,8 @@ impl ProgrammingAbortedArg {
                 arg17: 0,
                 arg18: 0,
             },
-            len => ProgrammingAbortedArg {
+
+            0x15 => ProgrammingAbortedArg {
                 arg_len: len,
                 arg01: args[0],
                 arg02: args[1],
@@ -3488,6 +3497,27 @@ impl ProgrammingAbortedArg {
                 arg16: args[15],
                 arg17: args[16],
                 arg18: args[17],
+            },
+            _ => ProgrammingAbortedArg {
+                arg_len: len,
+                arg01: *args.first().unwrap_or(&0u8),
+                arg02: *args.get(1).unwrap_or(&0u8),
+                arg03: *args.get(2).unwrap_or(&0u8),
+                arg04: *args.get(3).unwrap_or(&0u8),
+                arg05: *args.get(4).unwrap_or(&0u8),
+                arg06: *args.get(5).unwrap_or(&0u8),
+                arg07: *args.get(6).unwrap_or(&0u8),
+                arg08: *args.get(7).unwrap_or(&0u8),
+                arg09: *args.get(8).unwrap_or(&0u8),
+                arg10: *args.get(9).unwrap_or(&0u8),
+                arg11: *args.get(10).unwrap_or(&0u8),
+                arg12: *args.get(11).unwrap_or(&0u8),
+                arg13: *args.get(12).unwrap_or(&0u8),
+                arg14: *args.get(13).unwrap_or(&0u8),
+                arg15: *args.get(14).unwrap_or(&0u8),
+                arg16: *args.get(15).unwrap_or(&0u8),
+                arg17: *args.get(16).unwrap_or(&0u8),
+                arg18: *args.get(17).unwrap_or(&0u8),
             },
         }
     }

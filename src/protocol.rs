@@ -397,8 +397,13 @@ impl Message {
         if args.len() + 2 != args[0] as usize {
             return Err(MessageParseError::UnexpectedEnd);
         }
+
         match opc {
             0xED => {
+                if args.len() != 9 {
+                    return Err(MessageParseError::UnexpectedEnd);
+                }
+
                 if args[1] != 0x7F {
                     return Err(MessageParseError::InvalidFormat(format!(
                         "The check byte of the received message was invalid. \
@@ -411,11 +416,21 @@ impl Message {
                     args[1], args[2], args[3], args[4], args[5], args[6], args[7], args[8],
                 )))
             }
-            0xEF => Ok(Self::WrSlData(WrSlDataStructure::parse(
-                args[1], args[2], args[3], args[4], args[5], args[6], args[7], args[8], args[9],
-                args[10], args[11],
-            ))),
+            0xEF => {
+                if args.len() != 12 {
+                    return Err(MessageParseError::UnexpectedEnd);
+                }
+
+                Ok(Self::WrSlData(WrSlDataStructure::parse(
+                    args[1], args[2], args[3], args[4], args[5], args[6], args[7], args[8],
+                    args[9], args[10], args[11],
+                )))
+            }
             0xE7 => {
+                if args.len() != 12 {
+                    return Err(MessageParseError::UnexpectedEnd);
+                }
+
                 if args[1] == 0x7C {
                     Ok(Self::ProgrammingFinalResponse(
                         SlotArg::parse(args[1]),
@@ -454,14 +469,20 @@ impl Message {
                 Err(err) => return Err(err),
                 Ok(rep) => rep,
             })),
-            0xE5 => Ok(Self::PeerXfer(
-                SlotArg::parse(args[1]),
-                DstArg::parse(args[2], args[3]),
-                PxctData::parse(
-                    args[4], args[5], args[6], args[7], args[8], args[9], args[10], args[11],
-                    args[12], args[13],
-                ),
-            )),
+            0xE5 => {
+                if args.len() != 14 {
+                    return Err(MessageParseError::UnexpectedEnd);
+                }
+
+                Ok(Self::PeerXfer(
+                    SlotArg::parse(args[1]),
+                    DstArg::parse(args[2], args[3]),
+                    PxctData::parse(
+                        args[4], args[5], args[6], args[7], args[8], args[9], args[10], args[11],
+                        args[12], args[13],
+                    ),
+                ))
+            }
             _ => Err(MessageParseError::UnknownOpcode(opc)),
         }
     }
