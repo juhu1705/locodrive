@@ -12,7 +12,7 @@ A rust library for controlling a model train railroad system.
 ## Importing the LocoDrive
 
 As rust is able to use GitHub repositories directly as dependencies you can simply add 
-`locodrive = "0.1.1"` to your `Cargo.toml`
+`locodrive = "0.1.2"` to your `Cargo.toml`
 
 ### Features
 
