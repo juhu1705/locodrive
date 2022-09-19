@@ -10,11 +10,11 @@ pub enum MessageParseError {
     /// Please report this to the contributor.
     UnknownOpcode(u8),
     /// The messages length did not match the expected message length.
-    UnexpectedEnd,
+    UnexpectedEnd(u8),
     /// Some expected message format bytes did not contain the expected value.
     InvalidFormat(String),
     /// The checksum could not be validated. The received message is corrupted. Please retry sending.
-    InvalidChecksum,
+    InvalidChecksum(u8),
     /// This is used only by the controller to receive and handle a shutdown request.
     Update,
 }
@@ -23,8 +23,8 @@ impl Display for MessageParseError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match *self {
             Self::UnknownOpcode(opc) => write!(f, "unknown opcode: {:x}", opc),
-            Self::UnexpectedEnd => write!(f, "unexpected end of stream"),
-            Self::InvalidChecksum => write!(f, "invalid checksum"),
+            Self::UnexpectedEnd(opc) => write!(f, "unexpected end of stream, while reading message with opcode: {:x}", opc),
+            Self::InvalidChecksum(opc) => write!(f, "invalid checksum, while reading message with opcode: {:x}", opc),
             Self::Update => write!(f, "update"),
             Self::InvalidFormat(ref message) => write!(f, "invalid format: {:?}", message),
         }

@@ -249,7 +249,7 @@ impl Message {
 
         // validate checksum
         if !Self::validate(&buf[0..len]) {
-            return Err(MessageParseError::InvalidChecksum);
+            return Err(MessageParseError::InvalidChecksum(opc));
         }
 
         // call appropriate parse function
@@ -292,7 +292,7 @@ impl Message {
     /// [`UnexpectedEnd`]: MessageParseError::UnexpectedEnd
     fn parse4(opc: u8, args: &[u8]) -> Result<Self, MessageParseError> {
         if args.len() != 2 {
-            return Err(MessageParseError::UnexpectedEnd);
+            return Err(MessageParseError::UnexpectedEnd(opc));
         }
         match opc {
             0xBF => Ok(Self::LocoAdr(AddressArg::parse(args[0], args[1]))),
@@ -357,7 +357,7 @@ impl Message {
     /// [`InvalidFormat`]: MessageParseError::InvalidFormat
     fn parse6(opc: u8, args: &[u8]) -> Result<Self, MessageParseError> {
         if args.len() != 4 {
-            return Err(MessageParseError::UnexpectedEnd);
+            return Err(MessageParseError::UnexpectedEnd(opc));
         }
         match opc {
             0xD0 => Ok(Self::MultiSense(
@@ -395,20 +395,20 @@ impl Message {
     /// [`InvalidFormat`]: MessageParseError::InvalidFormat
     fn parse_var(opc: u8, args: &[u8]) -> Result<Self, MessageParseError> {
         if args.len() + 2 != args[0] as usize {
-            return Err(MessageParseError::UnexpectedEnd);
+            return Err(MessageParseError::UnexpectedEnd(opc));
         }
 
         match opc {
             0xED => {
                 if args.len() != 9 {
-                    return Err(MessageParseError::UnexpectedEnd);
+                    return Err(MessageParseError::UnexpectedEnd(opc));
                 }
 
                 if args[1] != 0x7F {
                     return Err(MessageParseError::InvalidFormat(format!(
-                        "The check byte of the received message was invalid. \
+                        "The check byte of the received message whith opcode {:x} was invalid. \
                             Expected 0x7F got {:02x}",
-                        args[1]
+                        opc, args[1]
                     )));
                 }
 
@@ -418,7 +418,7 @@ impl Message {
             }
             0xEF => {
                 if args.len() != 12 {
-                    return Err(MessageParseError::UnexpectedEnd);
+                    return Err(MessageParseError::UnexpectedEnd(opc));
                 }
 
                 Ok(Self::WrSlData(WrSlDataStructure::parse(
@@ -428,7 +428,7 @@ impl Message {
             }
             0xE7 => {
                 if args.len() != 12 {
-                    return Err(MessageParseError::UnexpectedEnd);
+                    return Err(MessageParseError::UnexpectedEnd(opc));
                 }
 
                 if args[1] == 0x7C {
@@ -463,7 +463,7 @@ impl Message {
             }
             0xE6 => {
                 if args.len() < 2 {
-                    return Err(MessageParseError::UnexpectedEnd);
+                    return Err(MessageParseError::UnexpectedEnd(opc));
                 }
 
                 Ok(Message::ProgrammingAborted(ProgrammingAbortedArg::parse(
@@ -473,7 +473,7 @@ impl Message {
             },
             0xE4 => {
                 if args.len() < 2 {
-                    return Err(MessageParseError::UnexpectedEnd);
+                    return Err(MessageParseError::UnexpectedEnd(opc));
                 }
 
                 Ok(Self::Rep(match RepStructure::parse(args[0], &args[1..]) {
@@ -483,7 +483,7 @@ impl Message {
             },
             0xE5 => {
                 if args.len() != 14 {
-                    return Err(MessageParseError::UnexpectedEnd);
+                    return Err(MessageParseError::UnexpectedEnd(opc));
                 }
 
                 Ok(Self::PeerXfer(

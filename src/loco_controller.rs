@@ -462,7 +462,7 @@ impl LocoDriveController {
         let opc = tokio::select! {
             opc = port.read_exact(&mut buf) => match opc {
                 Ok(_) => buf[0],
-                Err(_) => return Err(MessageParseError::UnexpectedEnd),
+                Err(_) => return Err(MessageParseError::UnexpectedEnd(0x00)),
             },
             _ = stopping.notified() => {
                 return Err(MessageParseError::Update)
@@ -488,7 +488,7 @@ impl LocoDriveController {
                         // We already read the messages first byte
                         read_len[0] as usize - 1
                     }
-                    Err(_) => return Err(MessageParseError::UnexpectedEnd),
+                    Err(_) => return Err(MessageParseError::UnexpectedEnd(opc)),
                 }
             }
             _ => return Err(MessageParseError::UnknownOpcode(opc)),
@@ -500,7 +500,7 @@ impl LocoDriveController {
         // We read the remaining message from the serial port
         buf.append(match port.read_exact(&mut message).await {
             Ok(_) => &mut message,
-            Err(_) => return Err(MessageParseError::UnexpectedEnd),
+            Err(_) => return Err(MessageParseError::UnexpectedEnd(opc)),
         });
 
         // Check for receiving last send message to awake the writing thread

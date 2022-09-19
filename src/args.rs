@@ -3136,7 +3136,7 @@ impl RepStructure {
     pub(crate) fn parse(count: u8, args: &[u8]) -> Result<Self, MessageParseError> {
         if args[0] == 0x00 {
             if count != 0x08 {
-                Err(MessageParseError::UnexpectedEnd)
+                Err(MessageParseError::UnexpectedEnd(0xE4))
             } else {
                 Ok(Self::LissyIrReport(LissyIrReport::parse(
                     args[0], args[1], args[2], args[3], args[4],
@@ -3144,7 +3144,7 @@ impl RepStructure {
             }
         } else if args[0] == 0x40 {
             if count != 0x08 {
-                Err(MessageParseError::UnexpectedEnd)
+                Err(MessageParseError::UnexpectedEnd(0xE4))
             } else {
                 Ok(Self::WheelcntReport(WheelcntReport::parse(
                     args[0], args[1], args[2], args[3], args[4],
@@ -3161,7 +3161,7 @@ impl RepStructure {
             )))
         } else {
             Err(MessageParseError::InvalidFormat(
-                "The report message was in invalid format!".into(),
+                "The report message (opcode: 0xE4) was in invalid format!".into(),
             ))
         }
     }
