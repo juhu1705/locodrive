@@ -461,14 +461,26 @@ impl Message {
                     ))
                 }
             }
-            0xE6 => Ok(Message::ProgrammingAborted(ProgrammingAbortedArg::parse(
-                args[0],
-                &args[1..],
-            ))),
-            0xE4 => Ok(Self::Rep(match RepStructure::parse(args[0], &args[1..]) {
-                Err(err) => return Err(err),
-                Ok(rep) => rep,
-            })),
+            0xE6 => {
+                if args.len() < 2 {
+                    return Err(MessageParseError::UnexpectedEnd);
+                }
+
+                Ok(Message::ProgrammingAborted(ProgrammingAbortedArg::parse(
+                    args[0],
+                    &args[1..],
+                )))
+            },
+            0xE4 => {
+                if args.len() < 2 {
+                    return Err(MessageParseError::UnexpectedEnd);
+                }
+
+                Ok(Self::Rep(match RepStructure::parse(args[0], &args[1..]) {
+                    Err(err) => return Err(err),
+                    Ok(rep) => rep,
+                }))
+            },
             0xE5 => {
                 if args.len() != 14 {
                     return Err(MessageParseError::UnexpectedEnd);

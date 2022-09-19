@@ -1,6 +1,6 @@
 [package]
 name = "locodrive"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2018"
 authors = ["Fabius Mettner <fabius1705@live.de>", "Niklas Elsbrock <mail@nelsbrock.de>"]
 license = "MIT OR Apache-2.0"
