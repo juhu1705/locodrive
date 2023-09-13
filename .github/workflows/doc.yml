@@ -33,7 +33,7 @@ jobs:
       - name: Add index page
         run: echo "<meta http-equiv=\"refresh\" content=\"0; url=doc/locodrive\">" > ./_site/index.html
       - name: Upload artifact
-        uses: actions/upload-pages-artifact@v1
+        uses: actions/upload-pages-artifact@v2
 
   # Deployment job
   deploy:
