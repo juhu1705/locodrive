@@ -275,7 +275,7 @@ impl SpeedArg {
     pub fn new(spd: u8) -> Self {
         match spd {
             0x00 => Self::Stop,
-            _ => Self::Drive(spd as u8),
+            _ => Self::Drive(spd),
         }
     }
 

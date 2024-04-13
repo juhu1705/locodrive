@@ -21,5 +21,5 @@ all = ["control"]
 [dependencies]
 tokio-serial = { version = "5.4", optional = true }
 tokio-util = { version = "0.7", features = ["codec"], optional = true }
-bytes = { version = "1", optional = true }
-tokio = { version = "1", features = ["rt", "rt-multi-thread", "io-util", "macros", "sync", "time"], optional = true }
+bytes = { version = "1.6", optional = true }
+tokio = { version = "1.37", features = ["rt", "rt-multi-thread", "io-util", "macros", "sync", "time"], optional = true }
