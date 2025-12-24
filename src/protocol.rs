@@ -470,17 +470,14 @@ impl Message {
                     args[0],
                     &args[1..],
                 )))
-            },
+            }
             0xE4 => {
                 if args.len() < 2 {
                     return Err(MessageParseError::UnexpectedEnd(opc));
                 }
 
-                Ok(Self::Rep(match RepStructure::parse(args[0], &args[1..]) {
-                    Err(err) => return Err(err),
-                    Ok(rep) => rep,
-                }))
-            },
+                Ok(Self::Rep(RepStructure::parse(args[0], &args[1..])?))
+            }
             0xE5 => {
                 if args.len() != 14 {
                     return Err(MessageParseError::UnexpectedEnd(opc));
@@ -501,7 +498,7 @@ impl Message {
 
     /// Validates the `msg` by xor-ing all bytes and checking for the result to be 0xFF.
     fn validate(msg: &[u8]) -> bool {
-        return msg.iter().fold(0, |acc, &b| acc ^ b) == 0xFF;
+        msg.iter().fold(0, |acc, &b| acc ^ b) == 0xFF
     }
 
     /// Parses the given [`Message`] to a [`Vec<u8>`] using the model railroads protocol.

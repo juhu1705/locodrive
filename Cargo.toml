@@ -2,7 +2,10 @@
 name = "locodrive"
 version = "0.1.3"
 edition = "2018"
-authors = ["Fabius Mettner <fabius1705@live.de>", "Niklas Elsbrock <mail@nelsbrock.de>"]
+authors = [
+  "Fabius Mettner <fabius1705@live.de>",
+  "Niklas Elsbrock <mail@nelsbrock.de>",
+]
 license = "MIT OR Apache-2.0"
 readme = "README.md"
 homepage = "https://github.com/juhu1705/locodrive"
@@ -21,5 +24,12 @@ all = ["control"]
 [dependencies]
 tokio-serial = { version = "5.4", optional = true }
 tokio-util = { version = "0.7", features = ["codec"], optional = true }
-bytes = { version = "1.6", optional = true }
-tokio = { version = "1.37", features = ["rt", "rt-multi-thread", "io-util", "macros", "sync", "time"], optional = true }
+bytes = { version = "1.11", optional = true }
+tokio = { version = "1.48", features = [
+  "rt",
+  "rt-multi-thread",
+  "io-util",
+  "macros",
+  "sync",
+  "time",
+], optional = true }

@@ -35,7 +35,7 @@ type ReferencedSendSynchronisation<'a> = Arc<(&'a Arc<Mutex<Vec<u8>>>, &'a Arc<N
 ///
 /// All received messages on the port are send to the defined channel.
 /// - Note: The auto returned messages as defined in the model railroads protocol are also send back to the channel.
-/// But the protocol ensures itself that the writer waits until the model railroad response is received.
+///   But the protocol ensures itself that the writer waits until the model railroad response is received.
 ///
 /// # Usage
 ///

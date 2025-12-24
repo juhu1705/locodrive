@@ -1,7 +1,7 @@
 /// Tests all testable core functions of this module
 #[cfg(test)]
 #[cfg(feature = "control")]
-mod tests {
+mod drive_tests {
     use crate::args::{
         Ack1Arg, AddressArg, Consist, CvDataArg, DecoderType, DirfArg, DstArg, FastClock,
         FunctionArg, FunctionGroup, IdArg, ImAddress, ImArg, ImFunctionType, InArg, LissyIrReport,
@@ -297,14 +297,13 @@ mod tests {
         loop {
             match receiver.recv().await {
                 Ok(message) => match message {
-                    LocoDriveMessage::Message(message) => match message {
-                        Message::SlRdData(slot, _, address, ..) => {
+                    LocoDriveMessage::Message(message) => {
+                        if let Message::SlRdData(slot, _, address, ..) = message {
                             slot_adr_map.insert(address, slot);
                             println!("Added {:?}, {:?} to {:?}", address, slot, slot_adr_map);
                             break;
                         }
-                        _ => {}
-                    },
+                    }
                     LocoDriveMessage::Answer(_, _) => {}
                     LocoDriveMessage::Error(err) => {
                         eprintln!("Message could not be read! {:?}", err);
@@ -374,12 +373,16 @@ mod tests {
 
             while let Ok(message) = receiver.recv().await {
                 match message {
-                    LocoDriveMessage::Message(message) => match message {
-                        Message::InputRep(in_arg) => {
-                            if i % 2 == 0
+                    LocoDriveMessage::Message(message) => {
+                        if let Message::InputRep(in_arg) = message {
+                            if (i % 2 == 0
                                 && in_arg.address() == 3
                                 && in_arg.input_source() == SourceType::Switch
-                                && in_arg.sensor_level() == SensorLevel::High
+                                && in_arg.sensor_level() == SensorLevel::High)
+                                || (i % 2 == 1
+                                    && in_arg.address() == 8
+                                    && in_arg.input_source() == SourceType::Switch
+                                    && in_arg.sensor_level() == SensorLevel::High)
                             {
                                 waiting = false;
                                 loco_controller
@@ -389,35 +392,19 @@ mod tests {
                                     ))
                                     .await
                                     .unwrap();
-                            } else if i % 2 == 1
-                                && in_arg.address() == 8
-                                && in_arg.input_source() == SourceType::Switch
-                                && in_arg.sensor_level() == SensorLevel::High
-                            {
-                                waiting = false;
-                                loco_controller
-                                    .send_message(LocoSpd(
-                                        *slot_adr_map.get(&adr).unwrap(),
-                                        SpeedArg::Drive(50),
-                                    ))
-                                    .await
-                                    .unwrap();
-                            } else if !waiting
+                            } else if (!waiting
                                 && in_arg.address() == 8
                                 && in_arg.input_source() == SourceType::Ds54Aux
-                                && in_arg.sensor_level() == SensorLevel::Low
-                            {
-                                break;
-                            } else if !waiting
-                                && in_arg.address() == 1
-                                && in_arg.input_source() == SourceType::Ds54Aux
-                                && in_arg.sensor_level() == SensorLevel::Low
+                                && in_arg.sensor_level() == SensorLevel::Low)
+                                || (!waiting
+                                    && in_arg.address() == 1
+                                    && in_arg.input_source() == SourceType::Ds54Aux
+                                    && in_arg.sensor_level() == SensorLevel::Low)
                             {
                                 break;
                             }
                         }
-                        _ => {}
-                    },
+                    }
                     LocoDriveMessage::Answer(_, _) => {}
                     LocoDriveMessage::Error(err) => {
                         eprintln!("Message could not be read! {:?}", err);

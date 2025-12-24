@@ -112,8 +112,8 @@ impl SwitchArg {
     ///
     /// - `sw1`: Seven least significant switch address bits
     /// - `sw2`: four most significant switch address bits,
-    ///          1 bit for direction and
-    ///          1 bit for activation state
+    ///   - 1 bit for direction and
+    ///   - 1 bit for activation state
     pub(crate) fn parse(sw1: u8, sw2: u8) -> Self {
         let mut address = sw1 as u16;
         address |= (sw2 as u16 & 0x0F) << 7;
@@ -271,7 +271,7 @@ impl SpeedArg {
     /// # Parameters
     ///
     /// - `spd`: The speed to create the `SpeedArg` for.
-    ///          The maximum speed is 126. Higher values may create unexpected behaviour.
+    ///   The maximum speed is 126. Higher values may create unexpected behaviour.
     pub fn new(spd: u8) -> Self {
         match spd {
             0x00 => Self::Stop,
@@ -400,7 +400,7 @@ impl DirfArg {
     /// # Parameters
     ///
     /// - `f_num`: The f-flag to set. (Only values in range of 0 to 4 may create an effect).
-    ///            Other inputs will be ignored.
+    ///   Other inputs will be ignored.
     /// - `value`: The value to set the requested flag to.
     pub fn set_f(&mut self, f_num: u8, value: bool) {
         if f_num <= 4 {
